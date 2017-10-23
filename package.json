@@ -6,6 +6,10 @@
   "scripts": {
     "test": "run dev"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Charlie9830/pounder-redux.git"
+  },
   "author": "Charlie Hall",
   "license": "MIT",
   "dependencies": {
