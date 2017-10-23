@@ -28,10 +28,8 @@ let initialState = {
 // Setup Firebase.
 setupFirebase("development");
 
-var appStore = createStore(
+export var appStore = createStore(
     appReducer,
     initialState,
     applyMiddleware(ReduxThunk.withExtraArgument(getFirestore), Logger)
 );
-
-export default appStore;

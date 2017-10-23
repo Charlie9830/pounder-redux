@@ -1,7 +1,6 @@
-import * as ActionTypes from '../actions-types/index';
+import * as ActionTypes from '../action-types/index';
 import { PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS } from 'pounder-firebase';
 import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore } from 'pounder-stores';
-
 import Moment from 'moment';
 
 // Standard Action Creators.
