@@ -25,7 +25,6 @@ let initialState = {
     openTaskListSettingsMenuId: -1
 }
 
-// Setup Firebase.
 setupFirebase("development");
 
 export var appStore = createStore(
