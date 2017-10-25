@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "babel ./reducers/appReducer.js --out-file ./reducers/index.js",
+    "build": "babel ./reducers/appReducer.js --out-file ./reducers/index.js && babel ./action-creators/action-creators.js --out-file ./action-creators/index.js",
     "test": "run dev"
   },
   "repository": {

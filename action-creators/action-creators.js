@@ -8,15 +8,15 @@ export function changeFocusedTaskList(id) {
     return {
         type: ActionTypes.CHANGE_FOCUSED_TASKLIST,
         id: id
-    };
+    }
 }
 
 export function selectTask(taskListWidgetId, taskId) {
     return {
         type: ActionTypes.SELECT_TASK,
         taskListWidgetId: taskListWidgetId,
-        taskId: taskId
-    };
+        taskId: taskId,
+    }
 }
 
 export function openTask(taskListWidgetId, taskId) {
@@ -24,7 +24,7 @@ export function openTask(taskListWidgetId, taskId) {
         type: ActionTypes.OPEN_TASK,
         taskListWidgetId: taskListWidgetId,
         taskId: taskId
-    };
+    }
 }
 
 export function closeTask(taskListWidgetId, taskId) {
@@ -32,7 +32,7 @@ export function closeTask(taskListWidgetId, taskId) {
         type: ActionTypes.CLOSE_TASK,
         taskListWidgetId: taskListWidgetId,
         taskId: taskId
-    };
+    }
 }
 
 export function startTaskMove(movingTaskId, sourceTaskListWidgetId) {
@@ -40,65 +40,65 @@ export function startTaskMove(movingTaskId, sourceTaskListWidgetId) {
         type: ActionTypes.START_TASK_MOVE,
         movingTaskId: movingTaskId,
         sourceTaskListWidgetId: sourceTaskListWidgetId
-    };
+    }
 }
 
 export function startTaskMoveInDatabase() {
     return {
         type: ActionTypes.START_TASK_MOVE_IN_DATABASE
-    };
+    }
 }
 
 export function startProjectsFetch() {
     return {
-        type: ActionTypes.START_PROJECTS_FETCH
-    };
+        type: ActionTypes.START_PROJECTS_FETCH,
+    }
 }
 
 export function receiveProjects(projects) {
     return {
         type: ActionTypes.RECEIVE_PROJECTS,
         projects: projects
-    };
+    }
 }
 
 export function startTasksFetch() {
     return {
         type: ActionTypes.START_TASKS_FETCH
-    };
+    }
 }
 
 export function receiveTasks(tasks) {
     return {
         type: ActionTypes.RECEIVE_TASKS,
         tasks: tasks
-    };
+    }
 }
 
 export function lockApp() {
     return {
-        type: ActionTypes.LOCK_APP
-    };
+        type: ActionTypes.LOCK_APP,
+    }
 }
 
 export function unlockApp() {
     return {
-        type: ActionTypes.UNLOCK_APP
-    };
+        type: ActionTypes.UNLOCK_APP,
+    }
 }
 
 export function setLastBackupMessage(message) {
     return {
         type: ActionTypes.SET_LAST_BACKUP_MESSAGE,
         message: message
-    };
+    }
 }
 
 export function setOpenTaskListSettingsMenuId(id) {
     return {
         type: ActionTypes.SET_OPEN_TASKLIST_SETTINGS_MENU_ID,
         id: id
-    };
+    }
 }
 
 export function openCalendar(taskListWidgetId, taskId) {
@@ -106,58 +106,58 @@ export function openCalendar(taskListWidgetId, taskId) {
         type: ActionTypes.OPEN_CALENDAR,
         taskListWidgetId: taskListWidgetId,
         taskId: taskId
-    };
+    }
 }
 
 export function startTasklistAdd() {
     return {
         type: ActionTypes.START_TASKLIST_ADD
-    };
+    }
 }
 
 export function startTaskAdd() {
     return {
         type: ActionTypes.START_TASK_ADD
-    };
+    }
 }
 
 export function startTaskListsFetch() {
     return {
         type: ActionTypes.START_TASKLISTS_FETCH
-    };
+    }
 }
 
 export function receiveTaskLists(taskLists) {
     return {
         type: ActionTypes.RECEIVE_TASKLISTS,
         taskLists: taskLists
-    };
+    }
 }
 
 export function startProjectLayoutsFetch() {
     return {
         type: ActionTypes.START_PROJECTLAYOUTS_FETCH
-    };
+    }
 }
 
 export function receiveProjectLayout(projectLayout) {
     return {
         type: ActionTypes.RECEIVE_PROJECTLAYOUT,
         projectLayout: projectLayout
-    };
+    }
 }
 
 export function selectProject(projectId) {
     return {
         type: ActionTypes.SELECT_PROJECT,
         projectId: projectId
-    };
+    }
 }
 
 export function closeCalendar() {
     return {
         type: ActionTypes.CLOSE_CALENDAR
-    };
+    }
 }
 
 // Private Actions.
@@ -167,8 +167,8 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
     return {
         type: ActionTypes.END_TASK_MOVE,
         movedTaskId: movingTaskId,
-        destinationTaskListWidgetId: destinationTaskListWidgetId
-    };
+        destinationTaskListWidgetId: destinationTaskListWidgetId,
+    }
 }
 
 // Thunks
@@ -183,8 +183,8 @@ export function updateTaskDueDateAsync(taskId, newDate) {
             isNewTask: false
         }).then(() => {
             // TODO: Dispatch Something.
-        });
-    };
+        })
+    }
 }
 
 export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
@@ -198,8 +198,8 @@ export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
             settings: Object.assign({}, newValue)
         }).then(() => {
             // TODO: Dispatch Something.
-        });
-    };
+        })
+    }
 }
 
 export function removeTaskListAsync(taskListWidgetId) {
@@ -217,13 +217,14 @@ export function removeTaskListAsync(taskListWidgetId) {
         // Tasks.
         taskIds.forEach(id => {
             batch.delete(getFirestore().collection(TASKS).doc(id));
-        });
+        })
 
         batch.commit().then(() => {
             // TODO: Dispatch Something.
-        });
-    };
+        })
+    }
 }
+
 
 export function updateProjectNameAsync(projectId, newValue) {
     return (dispatch, getState, getFirestore) => {
@@ -231,8 +232,8 @@ export function updateProjectNameAsync(projectId, newValue) {
         var projectRef = getFirestore().collection(PROJECTS).doc(projectId);
         projectRef.update({ projectName: newValue }).then(() => {
             // TODO: Dispatch something.
-        });
-    };
+        })
+    }
 }
 
 export function removeProjectAsync(projectId) {
@@ -241,9 +242,7 @@ export function removeProjectAsync(projectId) {
         // been loaded in via the handleProjectSelectorClick method. No point in querying Firebase again for this data.
         var taskListIds = getState().taskLists.filter(item => {
             return item.project === projectId;
-        }).map(taskList => {
-            return taskList.uid;
-        });
+        }).map(taskList => { return taskList.uid });
 
         var taskIds = collectProjectRelatedTaskIds(getState().tasks, projectId);
 
@@ -253,28 +252,29 @@ export function removeProjectAsync(projectId) {
         // Tasklists.
         taskListIds.forEach(id => {
             batch.delete(getFirestore().collection(TASKLISTS).doc(id));
-        });
+        })
 
         // Tasks
         taskIds.forEach(id => {
             batch.delete(getFirestore().collection(TASKS).doc(id));
-        });
+        })
 
         // Project Layout
         var projectLayoutId = getState().projectLayout.uid;
         if (projectLayoutId !== -1) {
             batch.delete(getFirestore().collection(PROJECTLAYOUTS).doc(projectLayoutId));
         }
-
+        
         // Project.
         batch.delete(getFirestore().collection(PROJECTS).doc(projectId));
 
         // Execute the Batch.
         batch.commit().then(() => {
             // TODO: Dispatch something.
-        });
-    };
+        })
+    }
 }
+
 
 export function addNewProjectAsync() {
     return (dispatch, getState, getFirestore) => {
@@ -298,13 +298,17 @@ export function addNewProjectAsync() {
         // Execute Additions.
         batch.commit().then(() => {
             // TODO: Dispatch Succsess Thingy
-        });
-    };
+        })
+    }
 }
+
+
+
 
 export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
     return (dispatch, getState, getFirestore) => {
-        if (getState().selectedTask.taskListWidgetId !== taskListWidgetId && getState().selectedTask.taskId !== taskId) {
+        if (getState().selectedTask.taskListWidgetId !== taskListWidgetId &&
+            getState().selectedTask.taskId !== taskId) {
             dispatch(selectTask(taskListWidgetId, taskId));
         }
 
@@ -316,21 +320,22 @@ export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
             isNewTask: false
         }).then(() => {
             // TODO: Sucsess Dispatch.
-        });
-    };
+        })
+    }
 }
 
 export function updateProjectLayoutAsync(layouts, projectId) {
     return (dispatch, getState, getFirestore) => {
         var newTrimmedLayouts = trimLayoutsHelper(layouts);
-
+        
         // Update Firestore.
         var projectLayoutsRef = getFirestore().collection(PROJECTLAYOUTS).doc(projectId);
         projectLayoutsRef.update({ layouts: newTrimmedLayouts }).then(() => {
             // TODO: Add Sucsess Dispatch
-        });
-    };
+        })
+    }
 }
+
 
 export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
     return (dispatch, getState, getFirestore) => {
@@ -340,12 +345,12 @@ export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
         // Update Firestore.
         var taskRef = getFirestore().collection(TASKS).doc(taskId);
         taskRef.update({
-            taskName: newData,
-            isNewTask: false // Reset new Task Property.
+          taskName: newData,
+          isNewTask: false // Reset new Task Property.
         }).then(() => {
-            // TODO: Add Sucsess Notification.
-        });
-    };
+          // TODO: Add Sucsess Notification.
+        })
+    }
 }
 
 export function removeSelectedTaskAsync() {
@@ -362,17 +367,19 @@ export function removeSelectedTaskAsync() {
                 // TODO: Add succsess Action.
             });
         }
-    };
+    }
 }
+
 
 export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
     return (dispatch, getState, getFirestore) => {
         var taskListRef = getFirestore().collection(TASKLISTS).doc(taskListWidgetId);
         taskListRef.update({ taskListName: newName }).then(() => {
             // Todo: Dispatch Something.
-        });
-    };
+        })
+    }
 }
+
 
 export function moveTaskAsync(destinationTaskListId) {
     return (dispatch, getState, getFirestore) => {
@@ -381,12 +388,13 @@ export function moveTaskAsync(destinationTaskListId) {
         var movingTaskId = getState().movingTaskId;
         var taskRef = getFirestore().collection(TASKS).doc(movingTaskId);
         taskRef.update({
-            taskList: destinationTaskListId
+          taskList: destinationTaskListId
         }).then(() => {
-            dispatch(endTaskMove(movingTaskId, destinationTaskListId));
-        });
-    };
+          dispatch(endTaskMove(movingTaskId, destinationTaskListId));
+        })
+    }
 }
+
 
 export function addNewTaskAsync() {
     return (dispatch, getState, getFirestore) => {
@@ -399,14 +407,24 @@ export function addNewTaskAsync() {
 
             var newTaskRef = getFirestore().collection(TASKS).doc();
             var newTaskKey = newTaskRef.id;
-
-            var newTask = new TaskStore("", "", false, selectedProjectId, focusedTaskListId, newTaskKey, new Moment().toISOString(), true);
-
-            newTaskRef.set(Object.assign({}, newTask)).then(() => {});
+      
+            var newTask = new TaskStore(
+              "",
+              "",
+              false,
+              selectedProjectId,
+              focusedTaskListId,
+              newTaskKey,
+              new Moment().toISOString(),
+              true
+            )
+      
+            newTaskRef.set(Object.assign({}, newTask)).then(() => {
+            })
 
             dispatch(openTask(newTask.taskList, newTask.uid)); // Opening a Task by convention Selects it.
-        }
-    };
+        }    
+    }
 }
 
 export function addNewTaskListAsync() {
@@ -415,13 +433,19 @@ export function addNewTaskListAsync() {
 
         // Add to Firestore.
         var newTaskListRef = getFirestore().collection(TASKLISTS).doc();
+        
+        var newTaskList = new TaskListStore(
+          "New Task List",
+          getState().selectedProjectId,
+          newTaskListRef.id,
+          newTaskListRef.id,
+          Object.assign({}, new TaskListSettingsStore(true, "completed"))
+        )
 
-        var newTaskList = new TaskListStore("New Task List", getState().selectedProjectId, newTaskListRef.id, newTaskListRef.id, Object.assign({}, new TaskListSettingsStore(true, "completed")));
-
-        newTaskListRef.set(Object.assign({}, newTaskList)).then(() => {
+        newTaskListRef.set(Object.assign({},newTaskList)).then(() => {
             // TODO: Add a Dispatch Here.
-        });
-    };
+        })
+    }
 }
 
 export function getProjectsAsync() {
@@ -431,13 +455,13 @@ export function getProjectsAsync() {
         // Get Projects from Firestore.
         getFirestore().collection("projects").onSnapshot(snapshot => {
             var projects = [];
-            snapshot.forEach(doc => {
+            snapshot.forEach( doc => {
                 projects.push(doc.data());
-            });
+            })
 
             dispatch(receiveProjects(projects));
-        });
-    };
+        })
+    }
 }
 
 export function getTasksAsync() {
@@ -445,14 +469,14 @@ export function getTasksAsync() {
         dispatch(startTasksFetch());
 
         // Get Tasks from Firestore.
-        getFirestore().collection(TASKS).orderBy("project").onSnapshot(snapshot => {
+        getFirestore().collection(TASKS).orderBy("project").onSnapshot( snapshot => {
             var tasks = [];
             snapshot.forEach(doc => {
                 tasks.push(doc.data());
-            });
+            })
             dispatch(receiveTasks(tasks));
-        });
-    };
+        })
+    }
 }
 
 export function getTaskListsAsync(projectId) {
@@ -463,12 +487,12 @@ export function getTaskListsAsync(projectId) {
         getFirestore().collection(TASKLISTS).where("project", "==", projectId).onSnapshot(snapshot => {
             var taskLists = [];
             snapshot.forEach(doc => {
-                taskLists.push(doc.data());
-            });
+              taskLists.push(doc.data());
+            })
 
             dispatch(receiveTaskLists(taskLists));
         });
-    };
+    }
 }
 
 export function getProjectLayoutsAsync(projectId) {
@@ -481,76 +505,76 @@ export function getProjectLayoutsAsync(projectId) {
             if (snapshot.empty !== true) {
                 snapshot.forEach(doc => {
                     projectLayouts.push(doc.data());
-                });
-            } else {
+                })
+            }
+
+            else {
                 projectLayouts[0] = new ProjectLayoutStore({}, -1, -1);
             }
 
             dispatch(receiveProjectLayout(projectLayouts[0]));
         });
-    };
+    }
 }
 
 export function unsubscribeProjectsAsync() {
     return (dispatch, getState, getFirestore) => {
-        var projectUnsubscribe = getFirestore().collection(PROJECTS).onSnapshot(() => {});
+        var projectUnsubscribe = getFirestore().collection(PROJECTS).onSnapshot( () => {});
         projectUnsubscribe();
-    };
+    }
 }
 
 export function unsubscribeTaskListsAsync() {
     return (dispatch, getState, getFirestore) => {
-        var taskListsUnsubscribe = getFirestore().collection(TASKLISTS).onSnapshot(() => {});
+        var taskListsUnsubscribe = getFirestore().collection(TASKLISTS).onSnapshot( () => {});
         taskListsUnsubscribe();
-    };
+    }
 }
 
 export function unsubscribeTasksAsync() {
     return (dispatch, getState, getFirestore) => {
-        var tasksUnsubscribe = getFirestore().collection(TASKS).onSnapshot(() => {});
+        var tasksUnsubscribe = getFirestore().collection(TASKS).onSnapshot( () => {});
         tasksUnsubscribe();
-    };
+    }
 }
 
 export function unsubscribeProjectLayoutsAsync() {
     return (dispatch, getState, getFirestore) => {
         if (getState().selectedProjectId !== -1) {
-            var projectLayoutsUnsubscribe = getFirestore().collection(PROJECTLAYOUTS).doc(getState().selectedProjectId).onSnapshot(() => {});
+            var projectLayoutsUnsubscribe = getFirestore().collection(PROJECTLAYOUTS).doc(getState().selectedProjectId).onSnapshot( () => {});
             projectLayoutsUnsubscribe();
-        }
-    };
+          }
+    }
 }
 
 // Helper Functions.
 function collectProjectRelatedTaskIds(tasks, projectId) {
     return tasks.filter(task => {
-        return task.project === projectId;
-    }).map(task => {
-        return task.uid;
-    });
+        return task.project === projectId
+    }).map(task => { return task.uid});
 }
 
 function collectTaskListRelatedTaskIds(tasks, taskListWidgetId) {
     // Collect related TaskIds.
     var taskIds = tasks.filter(task => {
         return task.taskList === taskListWidgetId;
-    }).map(task => {
-        return task.uid;
-    });
+    }).map(task => { return task.uid });
 
     return taskIds;
 }
 
+
 function trimLayoutsHelper(layouts) {
     var trimmedLayouts = layouts.map(item => {
-        return {
-            i: item.i,
-            x: item.x,
-            y: item.y,
-            w: item.w,
-            h: item.h
-        };
-    });
+      return {
+        i: item.i,
+        x: item.x,
+        y: item.y,
+        w: item.w,
+        h: item.h,
+      }
+    })
 
-    return trimmedLayouts;
-}
+    return trimmedLayouts
+  }
+
