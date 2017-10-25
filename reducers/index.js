@@ -1,9 +1,22 @@
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+
 var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
 
-import * as ActionTypes from '../action-types/index';
-import { ParseDueDate } from 'pounder-utilities';
+exports.appReducer = appReducer;
 
-export function appReducer(state, action) {
+var _index = require('../action-types/index');
+
+var ActionTypes = _interopRequireWildcard(_index);
+
+var _pounderUtilities = require('pounder-utilities');
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+
+function appReducer(state, action) {
     switch (action.type) {
         case ActionTypes.CHANGE_FOCUSED_TASKLIST:
             return _extends({}, state, {
@@ -13,7 +26,7 @@ export function appReducer(state, action) {
             });
 
         case ActionTypes.SELECT_TASK:
-            const openCalendarId = state.openCalendarId === action.taskId ? action.taskId : -1; // Keep calender open if Open already.
+            var openCalendarId = state.openCalendarId === action.taskId ? action.taskId : -1; // Keep calender open if Open already.
 
             return _extends({}, state, {
                 selectedTask: { taskListWidgetId: action.taskListWidgetId, taskId: action.taskId, isInputOpen: false },
@@ -169,16 +182,18 @@ export function appReducer(state, action) {
 }
 
 // Helper Methods.
-var getProjectSelectorDueDateDisplaysHelper = function (tasks) {
+var getProjectSelectorDueDateDisplaysHelper = function getProjectSelectorDueDateDisplaysHelper(tasks) {
     var returnList = {};
 
-    tasks.forEach(item => {
+    tasks.forEach(function (item) {
         if (item.dueDate !== "" && item.isComplete !== true) {
             if (returnList[item.project] == undefined) {
                 returnList[item.project] = { greens: 0, yellows: 0, reds: 0 };
             }
 
-            var { className } = ParseDueDate(item.isComplete, item.dueDate);
+            var _ParseDueDate = (0, _pounderUtilities.ParseDueDate)(item.isComplete, item.dueDate),
+                className = _ParseDueDate.className;
+
             switch (className) {
                 case "DueDate Later":
                     returnList[item.project].greens += 1;

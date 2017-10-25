@@ -5,7 +5,7 @@ import ReduxThunk from 'redux-thunk';
 import { setupFirebase, getFirestore } from 'pounder-firebase';
 import { ProjectLayoutStore } from 'pounder-stores';
 
-let initialState = {
+var initialState = {
     projects: [],
     taskLists: [],
     tasks: [],
