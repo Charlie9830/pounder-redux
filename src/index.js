@@ -23,7 +23,6 @@ var initialState = {
     isLockScreenDisplayed: false,
     lastBackupMessage: "",
     openTaskListSettingsMenuId: -1,
-    pendingFirestoreTaskUpdates: 0,
 }
 
 setupFirebase("development");
