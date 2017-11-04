@@ -473,7 +473,8 @@ export function getTasksAsync() {
             var tasks = [];
             snapshot.forEach(doc => {
                 tasks.push(doc.data());
-            })
+            });
+
             dispatch(receiveTasks(tasks));
         })
     }
@@ -489,7 +490,6 @@ export function getTaskListsAsync(projectId) {
             snapshot.forEach(doc => {
               taskLists.push(doc.data());
             })
-
             dispatch(receiveTaskLists(taskLists));
         });
     }

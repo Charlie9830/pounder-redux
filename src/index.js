@@ -22,7 +22,8 @@ var initialState = {
     projectSelectorDueDateDisplays: [],
     isLockScreenDisplayed: false,
     lastBackupMessage: "",
-    openTaskListSettingsMenuId: -1
+    openTaskListSettingsMenuId: -1,
+    pendingFirestoreTaskUpdates: 0,
 }
 
 setupFirebase("development");
@@ -30,5 +31,5 @@ setupFirebase("development");
 export var appStore = createStore(
     appReducer,
     initialState,
-    applyMiddleware(ReduxThunk.withExtraArgument(getFirestore), Logger)
+    applyMiddleware(ReduxThunk.withExtraArgument(getFirestore),/* Logger */)
 );

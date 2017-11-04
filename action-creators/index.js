@@ -515,6 +515,7 @@ function getTasksAsync() {
             snapshot.forEach(function (doc) {
                 tasks.push(doc.data());
             });
+
             dispatch(receiveTasks(tasks));
         });
     };
@@ -530,7 +531,6 @@ function getTaskListsAsync(projectId) {
             snapshot.forEach(function (doc) {
                 taskLists.push(doc.data());
             });
-
             dispatch(receiveTaskLists(taskLists));
         });
     };

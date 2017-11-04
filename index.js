@@ -5,6 +5,8 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.appStore = undefined;
 
+var _initialState;
+
 var _redux = require('redux');
 
 var _index = require('./reducers/index');
@@ -25,7 +27,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
-var initialState = _defineProperty({
+var initialState = (_initialState = {
     projects: [],
     taskLists: [],
     tasks: [],
@@ -42,8 +44,8 @@ var initialState = _defineProperty({
     projectSelectorDueDateDisplays: [],
     isLockScreenDisplayed: false,
     lastBackupMessage: ""
-}, 'openTaskListSettingsMenuId', -1);
+}, _defineProperty(_initialState, 'openTaskListSettingsMenuId', -1), _defineProperty(_initialState, 'pendingFirestoreTaskUpdates', 0), _initialState);
 
 (0, _pounderFirebase.setupFirebase)("development");
 
-var appStore = exports.appStore = (0, _redux.createStore)(_index.appReducer, initialState, (0, _redux.applyMiddleware)(_reduxThunk2.default.withExtraArgument(_pounderFirebase.getFirestore), _reduxLogger2.default));
+var appStore = exports.appStore = (0, _redux.createStore)(_index.appReducer, initialState, (0, _redux.applyMiddleware)(_reduxThunk2.default.withExtraArgument(_pounderFirebase.getFirestore) /* Logger */));
