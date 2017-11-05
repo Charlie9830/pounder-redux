@@ -527,7 +527,7 @@ export function getTaskListsAsync(projectId) {
         dispatch(startTaskListsFetch());
 
         // Get Tasklists from Firestore.
-        getFirestore().collection(TASKLISTS).where("project", "==", projectId).onSnapshot(IncludeQueryMetadataChanges, snapshot => {
+        getFirestore().collection(TASKLISTS).onSnapshot(IncludeQueryMetadataChanges, snapshot => {
             // Handle Metadata.
             dispatch(setTaskListsHavePendingWrites(snapshot.metadata.hasPendingWrites));
 

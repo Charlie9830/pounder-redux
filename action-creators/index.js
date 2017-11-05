@@ -573,7 +573,7 @@ function getTaskListsAsync(projectId) {
         dispatch(startTaskListsFetch());
 
         // Get Tasklists from Firestore.
-        getFirestore().collection(_pounderFirebase.TASKLISTS).where("project", "==", projectId).onSnapshot(_index2.IncludeQueryMetadataChanges, function (snapshot) {
+        getFirestore().collection(_pounderFirebase.TASKLISTS).onSnapshot(_index2.IncludeQueryMetadataChanges, function (snapshot) {
             // Handle Metadata.
             dispatch(setTaskListsHavePendingWrites(snapshot.metadata.hasPendingWrites));
 
