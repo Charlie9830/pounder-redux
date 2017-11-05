@@ -5,6 +5,21 @@ import ReduxThunk from 'redux-thunk';
 import { setupFirebase, getFirestore } from 'pounder-firebase';
 import { ProjectLayoutStore } from 'pounder-stores';
 
+export var IncludeQueryMetadataChanges = { includeQueryMetadataChanges: false }
+
+// Make sure you are calling this first before using the Store.
+export function setupBackend(mode, platform) {
+    setupFirebase(mode);
+    
+    if (platform === "desktop") {
+        IncludeQueryMetadataChanges = { includeQueryMetadataChanges: true }
+    }
+
+    else {
+        IncludeQueryMetadataChanges = { includeQueryMetadataChanges: false }
+    }
+}
+
 var initialState = {
     projects: [],
     taskLists: [],
@@ -23,9 +38,11 @@ var initialState = {
     isLockScreenDisplayed: false,
     lastBackupMessage: "",
     openTaskListSettingsMenuId: -1,
+    projectsHavePendingWrites: false,
+    projectLayoutsHavePendingWrites: false,
+    taskListsHavePendingWrites: false,
+    tasksHavePendingWrites: false,
 }
-
-setupFirebase("development");
 
 export var appStore = createStore(
     appReducer,

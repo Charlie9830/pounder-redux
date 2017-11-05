@@ -186,6 +186,30 @@ export function appReducer(state, action) {
                 openCalendarId: -1
             }
         
+        case ActionTypes.SET_PROJECTS_HAVE_PENDING_WRITES: 
+            return {
+                ...state,
+                projectsHavePendingWrites: action.value
+            }
+        
+        case ActionTypes.SET_PROJECTLAYOUTS_HAVE_PENDING_WRITES:
+            return {
+                ...state,
+                projectLayoutsHavePendingWrites: action.value
+            }
+        
+        case ActionTypes.SET_TASKLISTS_HAVE_PENDING_WRITES:
+            return {
+                ...state,
+                taskListsHavePendingWrites: action.value
+            }
+
+        case ActionTypes.SET_TASKS_HAVE_PENDING_WRITES:
+            return {
+                ...state,
+                tasksHavePendingWrites: action.value,
+            }
+        
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);
             return state;

@@ -3,9 +3,11 @@
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-exports.appStore = undefined;
+exports.appStore = exports.IncludeQueryMetadataChanges = undefined;
 
 var _initialState;
+
+exports.setupBackend = setupBackend;
 
 var _redux = require('redux');
 
@@ -27,6 +29,19 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
+var IncludeQueryMetadataChanges = exports.IncludeQueryMetadataChanges = { includeQueryMetadataChanges: false
+
+    // Make sure you are calling this first before using the Store.
+};function setupBackend(mode, platform) {
+    (0, _pounderFirebase.setupFirebase)(mode);
+
+    if (platform === "desktop") {
+        exports.IncludeQueryMetadataChanges = IncludeQueryMetadataChanges = { includeQueryMetadataChanges: true };
+    } else {
+        exports.IncludeQueryMetadataChanges = IncludeQueryMetadataChanges = { includeQueryMetadataChanges: false };
+    }
+}
+
 var initialState = (_initialState = {
     projects: [],
     taskLists: [],
@@ -44,8 +59,6 @@ var initialState = (_initialState = {
     projectSelectorDueDateDisplays: [],
     isLockScreenDisplayed: false,
     lastBackupMessage: ""
-}, _defineProperty(_initialState, 'openTaskListSettingsMenuId', -1), _defineProperty(_initialState, 'pendingFirestoreTaskUpdates', 0), _initialState);
-
-(0, _pounderFirebase.setupFirebase)("development");
+}, _defineProperty(_initialState, 'openTaskListSettingsMenuId', -1), _defineProperty(_initialState, 'projectsHavePendingWrites', false), _defineProperty(_initialState, 'projectLayoutsHavePendingWrites', false), _defineProperty(_initialState, 'taskListsHavePendingWrites', false), _defineProperty(_initialState, 'tasksHavePendingWrites', false), _initialState);
 
 var appStore = exports.appStore = (0, _redux.createStore)(_index.appReducer, initialState, (0, _redux.applyMiddleware)(_reduxThunk2.default.withExtraArgument(_pounderFirebase.getFirestore) /* Logger */));

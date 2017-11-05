@@ -2,6 +2,7 @@ import * as ActionTypes from '../action-types/index';
 import { PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS } from 'pounder-firebase';
 import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore } from 'pounder-stores';
 import Moment from 'moment';
+import { IncludeQueryMetadataChanges } from '../index';
 
 // Standard Action Creators.
 export function changeFocusedTaskList(id) {
@@ -160,6 +161,34 @@ export function closeCalendar() {
     }
 }
 
+export function setProjectsHavePendingWrites(value) {
+    return {
+        type: ActionTypes.SET_PROJECTS_HAVE_PENDING_WRITES,
+        value: value
+    }
+}
+
+export function setProjectLayoutsHavePendingWrites(value) {
+    return {
+        type: ActionTypes.SET_PROJECTLAYOUTS_HAVE_PENDING_WRITES,
+        value: value
+    }
+}
+
+export function setTaskListsHavePendingWrites(value) {
+    return {
+        type: ActionTypes.SET_TASKLISTS_HAVE_PENDING_WRITES,
+        value: value
+    }
+}
+
+export function setTasksHavePendingWrites(value) {
+    return {
+        type: ActionTypes.SET_TASKS_HAVE_PENDING_WRITES,
+        value: value,
+    }
+}
+
 // Private Actions.
 // Should only be dispatched by moveTaskAsync(), as moveTaskAsync() gets the movingTaskId from the State. Calling this from elsewhere
 // could create a race Condition.
@@ -182,7 +211,7 @@ export function updateTaskDueDateAsync(taskId, newDate) {
             dueDate: newDate,
             isNewTask: false
         }).then(() => {
-            // TODO: Dispatch Something.
+            // Carefull what you do here, promises don't resolve if you are offline.
         })
     }
 }
@@ -197,7 +226,7 @@ export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
         taskListRef.update({
             settings: Object.assign({}, newValue)
         }).then(() => {
-            // TODO: Dispatch Something.
+            /// Carefull what you do here, promises don't resolve if you are offline.
         })
     }
 }
@@ -220,7 +249,7 @@ export function removeTaskListAsync(taskListWidgetId) {
         })
 
         batch.commit().then(() => {
-            // TODO: Dispatch Something.
+            // Carefull what you do here. Promises don't resolve if you are Offline.
         })
     }
 }
@@ -231,7 +260,7 @@ export function updateProjectNameAsync(projectId, newValue) {
         // Update Firestore.
         var projectRef = getFirestore().collection(PROJECTS).doc(projectId);
         projectRef.update({ projectName: newValue }).then(() => {
-            // TODO: Dispatch something.
+            // Carefull what you do here, promises don't resolve if you are offline.
         })
     }
 }
@@ -270,7 +299,7 @@ export function removeProjectAsync(projectId) {
 
         // Execute the Batch.
         batch.commit().then(() => {
-            // TODO: Dispatch something.
+            // Carefull what you do here, promises don't resolve if you are offline.
         })
     }
 }
@@ -297,7 +326,7 @@ export function addNewProjectAsync() {
 
         // Execute Additions.
         batch.commit().then(() => {
-            // TODO: Dispatch Succsess Thingy
+            // Carefull what you do here, promises don't resolve if you are offline.
         })
     }
 }
@@ -319,7 +348,7 @@ export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
             isComplete: newValue,
             isNewTask: false
         }).then(() => {
-            // TODO: Sucsess Dispatch.
+            // Carefull what you do here, promises don't resolve if you are offline.h.
         })
     }
 }
@@ -331,7 +360,7 @@ export function updateProjectLayoutAsync(layouts, projectId) {
         // Update Firestore.
         var projectLayoutsRef = getFirestore().collection(PROJECTLAYOUTS).doc(projectId);
         projectLayoutsRef.update({ layouts: newTrimmedLayouts }).then(() => {
-            // TODO: Add Sucsess Dispatch
+            // Carefull what you do here, promises don't resolve if you are offline.
         })
     }
 }
@@ -348,7 +377,7 @@ export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
           taskName: newData,
           isNewTask: false // Reset new Task Property.
         }).then(() => {
-          // TODO: Add Sucsess Notification.
+          // Carefull what you do here, promises don't resolve if you are offline.
         })
     }
 }
@@ -364,7 +393,7 @@ export function removeSelectedTaskAsync() {
             batch.delete(taskRef);
 
             batch.commit().then(() => {
-                // TODO: Add succsess Action.
+                // Carefull what you do here, promises don't resolve if you are offline.
             });
         }
     }
@@ -375,7 +404,7 @@ export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
     return (dispatch, getState, getFirestore) => {
         var taskListRef = getFirestore().collection(TASKLISTS).doc(taskListWidgetId);
         taskListRef.update({ taskListName: newName }).then(() => {
-            // Todo: Dispatch Something.
+            // Carefull what you do here, promises don't resolve if you are offline.
         })
     }
 }
@@ -390,8 +419,10 @@ export function moveTaskAsync(destinationTaskListId) {
         taskRef.update({
           taskList: destinationTaskListId
         }).then(() => {
-          dispatch(endTaskMove(movingTaskId, destinationTaskListId));
+          /// Carefull what you do here, promises don't resolve if you are offline.
         })
+
+        dispatch(endTaskMove(movingTaskId, destinationTaskListId));
     }
 }
 
@@ -443,7 +474,7 @@ export function addNewTaskListAsync() {
         )
 
         newTaskListRef.set(Object.assign({},newTaskList)).then(() => {
-            // TODO: Add a Dispatch Here.
+            // Carefull what you do here, promises don't resolve if you are offline.
         })
     }
 }
@@ -453,13 +484,18 @@ export function getProjectsAsync() {
         dispatch(startProjectsFetch());
 
         // Get Projects from Firestore.
-        getFirestore().collection("projects").onSnapshot(snapshot => {
-            var projects = [];
-            snapshot.forEach( doc => {
-                projects.push(doc.data());
-            })
+        getFirestore().collection("projects").onSnapshot(IncludeQueryMetadataChanges, snapshot => {
+            // Handle metadata.
+            dispatch(setProjectsHavePendingWrites(snapshot.metadata.hasPendingWrites));
 
-            dispatch(receiveProjects(projects));
+            if (snapshot.docChanges.length > 0) {
+                var projects = [];
+                snapshot.forEach( doc => {
+                    projects.push(doc.data());
+                })
+
+                dispatch(receiveProjects(projects));
+            }
         })
     }
 }
@@ -469,13 +505,19 @@ export function getTasksAsync() {
         dispatch(startTasksFetch());
 
         // Get Tasks from Firestore.
-        getFirestore().collection(TASKS).orderBy("project").onSnapshot( snapshot => {
-            var tasks = [];
-            snapshot.forEach(doc => {
-                tasks.push(doc.data());
-            });
+        getFirestore().collection(TASKS).orderBy("project").onSnapshot( IncludeQueryMetadataChanges, snapshot => {
+            // Handle Metadata.
+            dispatch(setTasksHavePendingWrites(snapshot.metadata.hasPendingWrites))
 
-            dispatch(receiveTasks(tasks));
+            // Handle Tasks.
+            if (snapshot.docChanges.length > 0) {
+                var tasks = [];
+                snapshot.forEach(doc => {
+                    tasks.push(doc.data());
+                });
+
+                dispatch(receiveTasks(tasks));
+            }
         })
     }
 }
@@ -485,12 +527,18 @@ export function getTaskListsAsync(projectId) {
         dispatch(startTaskListsFetch());
 
         // Get Tasklists from Firestore.
-        getFirestore().collection(TASKLISTS).where("project", "==", projectId).onSnapshot(snapshot => {
-            var taskLists = [];
-            snapshot.forEach(doc => {
-              taskLists.push(doc.data());
-            })
-            dispatch(receiveTaskLists(taskLists));
+        getFirestore().collection(TASKLISTS).where("project", "==", projectId).onSnapshot(IncludeQueryMetadataChanges, snapshot => {
+            // Handle Metadata.
+            dispatch(setTaskListsHavePendingWrites(snapshot.metadata.hasPendingWrites));
+
+            if (snapshot.docChanges.length > 0) {
+                var taskLists = [];
+                snapshot.forEach(doc => {
+                  taskLists.push(doc.data());
+                })
+
+                dispatch(receiveTaskLists(taskLists));
+            }
         });
     }
 }
@@ -499,20 +547,24 @@ export function getProjectLayoutsAsync(projectId) {
     return (dispatch, getState, getFirestore) => {
         dispatch(startProjectLayoutsFetch());
 
-        getFirestore().collection(PROJECTLAYOUTS).where("project", "==", projectId).onSnapshot(snapshot => {
-            var projectLayouts = [];
+        getFirestore().collection(PROJECTLAYOUTS).where("project", "==", projectId).onSnapshot( IncludeQueryMetadataChanges, snapshot => {
+            // Handle Metadata.
+            dispatch(setProjectLayoutsHavePendingWrites(snapshot.metadata.hasPendingWrites));
 
-            if (snapshot.empty !== true) {
-                snapshot.forEach(doc => {
-                    projectLayouts.push(doc.data());
-                })
+            if (snapshot.docChanges.length > 0) {
+                var projectLayouts = [];
+                if (snapshot.empty !== true) {
+                    snapshot.forEach(doc => {
+                        projectLayouts.push(doc.data());
+                    })
+                }
+
+                else {
+                    projectLayouts[0] = new ProjectLayoutStore({}, -1, -1);
+                }
+
+                dispatch(receiveProjectLayout(projectLayouts[0]));
             }
-
-            else {
-                projectLayouts[0] = new ProjectLayoutStore({}, -1, -1);
-            }
-
-            dispatch(receiveProjectLayout(projectLayouts[0]));
         });
     }
 }

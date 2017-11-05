@@ -26,6 +26,10 @@ exports.startProjectLayoutsFetch = startProjectLayoutsFetch;
 exports.receiveProjectLayout = receiveProjectLayout;
 exports.selectProject = selectProject;
 exports.closeCalendar = closeCalendar;
+exports.setProjectsHavePendingWrites = setProjectsHavePendingWrites;
+exports.setProjectLayoutsHavePendingWrites = setProjectLayoutsHavePendingWrites;
+exports.setTaskListsHavePendingWrites = setTaskListsHavePendingWrites;
+exports.setTasksHavePendingWrites = setTasksHavePendingWrites;
 exports.updateTaskDueDateAsync = updateTaskDueDateAsync;
 exports.updateTaskListSettingsAsync = updateTaskListSettingsAsync;
 exports.removeTaskListAsync = removeTaskListAsync;
@@ -60,6 +64,8 @@ var _pounderStores = require('pounder-stores');
 var _moment = require('moment');
 
 var _moment2 = _interopRequireDefault(_moment);
+
+var _index2 = require('../index');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -222,6 +228,34 @@ function closeCalendar() {
     };
 }
 
+function setProjectsHavePendingWrites(value) {
+    return {
+        type: ActionTypes.SET_PROJECTS_HAVE_PENDING_WRITES,
+        value: value
+    };
+}
+
+function setProjectLayoutsHavePendingWrites(value) {
+    return {
+        type: ActionTypes.SET_PROJECTLAYOUTS_HAVE_PENDING_WRITES,
+        value: value
+    };
+}
+
+function setTaskListsHavePendingWrites(value) {
+    return {
+        type: ActionTypes.SET_TASKLISTS_HAVE_PENDING_WRITES,
+        value: value
+    };
+}
+
+function setTasksHavePendingWrites(value) {
+    return {
+        type: ActionTypes.SET_TASKS_HAVE_PENDING_WRITES,
+        value: value
+    };
+}
+
 // Private Actions.
 // Should only be dispatched by moveTaskAsync(), as moveTaskAsync() gets the movingTaskId from the State. Calling this from elsewhere
 // could create a race Condition.
@@ -244,7 +278,7 @@ function updateTaskDueDateAsync(taskId, newDate) {
             dueDate: newDate,
             isNewTask: false
         }).then(function () {
-            // TODO: Dispatch Something.
+            // Carefull what you do here, promises don't resolve if you are offline.
         });
     };
 }
@@ -259,7 +293,7 @@ function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
         taskListRef.update({
             settings: Object.assign({}, newValue)
         }).then(function () {
-            // TODO: Dispatch Something.
+            /// Carefull what you do here, promises don't resolve if you are offline.
         });
     };
 }
@@ -282,7 +316,7 @@ function removeTaskListAsync(taskListWidgetId) {
         });
 
         batch.commit().then(function () {
-            // TODO: Dispatch Something.
+            // Carefull what you do here. Promises don't resolve if you are Offline.
         });
     };
 }
@@ -292,7 +326,7 @@ function updateProjectNameAsync(projectId, newValue) {
         // Update Firestore.
         var projectRef = getFirestore().collection(_pounderFirebase.PROJECTS).doc(projectId);
         projectRef.update({ projectName: newValue }).then(function () {
-            // TODO: Dispatch something.
+            // Carefull what you do here, promises don't resolve if you are offline.
         });
     };
 }
@@ -333,7 +367,7 @@ function removeProjectAsync(projectId) {
 
         // Execute the Batch.
         batch.commit().then(function () {
-            // TODO: Dispatch something.
+            // Carefull what you do here, promises don't resolve if you are offline.
         });
     };
 }
@@ -359,7 +393,7 @@ function addNewProjectAsync() {
 
         // Execute Additions.
         batch.commit().then(function () {
-            // TODO: Dispatch Succsess Thingy
+            // Carefull what you do here, promises don't resolve if you are offline.
         });
     };
 }
@@ -377,7 +411,7 @@ function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
             isComplete: newValue,
             isNewTask: false
         }).then(function () {
-            // TODO: Sucsess Dispatch.
+            // Carefull what you do here, promises don't resolve if you are offline.h.
         });
     };
 }
@@ -389,7 +423,7 @@ function updateProjectLayoutAsync(layouts, projectId) {
         // Update Firestore.
         var projectLayoutsRef = getFirestore().collection(_pounderFirebase.PROJECTLAYOUTS).doc(projectId);
         projectLayoutsRef.update({ layouts: newTrimmedLayouts }).then(function () {
-            // TODO: Add Sucsess Dispatch
+            // Carefull what you do here, promises don't resolve if you are offline.
         });
     };
 }
@@ -405,7 +439,7 @@ function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
             taskName: newData,
             isNewTask: false // Reset new Task Property.
         }).then(function () {
-            // TODO: Add Sucsess Notification.
+            // Carefull what you do here, promises don't resolve if you are offline.
         });
     };
 }
@@ -421,7 +455,7 @@ function removeSelectedTaskAsync() {
             batch.delete(taskRef);
 
             batch.commit().then(function () {
-                // TODO: Add succsess Action.
+                // Carefull what you do here, promises don't resolve if you are offline.
             });
         }
     };
@@ -431,7 +465,7 @@ function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
     return function (dispatch, getState, getFirestore) {
         var taskListRef = getFirestore().collection(_pounderFirebase.TASKLISTS).doc(taskListWidgetId);
         taskListRef.update({ taskListName: newName }).then(function () {
-            // Todo: Dispatch Something.
+            // Carefull what you do here, promises don't resolve if you are offline.
         });
     };
 }
@@ -445,8 +479,10 @@ function moveTaskAsync(destinationTaskListId) {
         taskRef.update({
             taskList: destinationTaskListId
         }).then(function () {
-            dispatch(endTaskMove(movingTaskId, destinationTaskListId));
+            /// Carefull what you do here, promises don't resolve if you are offline.
         });
+
+        dispatch(endTaskMove(movingTaskId, destinationTaskListId));
     };
 }
 
@@ -484,7 +520,7 @@ function addNewTaskListAsync() {
         var newTaskList = new _pounderStores.TaskListStore("New Task List", getState().selectedProjectId, newTaskListRef.id, newTaskListRef.id, Object.assign({}, new _pounderStores.TaskListSettingsStore(true, "completed")));
 
         newTaskListRef.set(Object.assign({}, newTaskList)).then(function () {
-            // TODO: Add a Dispatch Here.
+            // Carefull what you do here, promises don't resolve if you are offline.
         });
     };
 }
@@ -494,13 +530,18 @@ function getProjectsAsync() {
         dispatch(startProjectsFetch());
 
         // Get Projects from Firestore.
-        getFirestore().collection("projects").onSnapshot(function (snapshot) {
-            var projects = [];
-            snapshot.forEach(function (doc) {
-                projects.push(doc.data());
-            });
+        getFirestore().collection("projects").onSnapshot(_index2.IncludeQueryMetadataChanges, function (snapshot) {
+            // Handle metadata.
+            dispatch(setProjectsHavePendingWrites(snapshot.metadata.hasPendingWrites));
 
-            dispatch(receiveProjects(projects));
+            if (snapshot.docChanges.length > 0) {
+                var projects = [];
+                snapshot.forEach(function (doc) {
+                    projects.push(doc.data());
+                });
+
+                dispatch(receiveProjects(projects));
+            }
         });
     };
 }
@@ -510,13 +551,19 @@ function getTasksAsync() {
         dispatch(startTasksFetch());
 
         // Get Tasks from Firestore.
-        getFirestore().collection(_pounderFirebase.TASKS).orderBy("project").onSnapshot(function (snapshot) {
-            var tasks = [];
-            snapshot.forEach(function (doc) {
-                tasks.push(doc.data());
-            });
+        getFirestore().collection(_pounderFirebase.TASKS).orderBy("project").onSnapshot(_index2.IncludeQueryMetadataChanges, function (snapshot) {
+            // Handle Metadata.
+            dispatch(setTasksHavePendingWrites(snapshot.metadata.hasPendingWrites));
 
-            dispatch(receiveTasks(tasks));
+            // Handle Tasks.
+            if (snapshot.docChanges.length > 0) {
+                var tasks = [];
+                snapshot.forEach(function (doc) {
+                    tasks.push(doc.data());
+                });
+
+                dispatch(receiveTasks(tasks));
+            }
         });
     };
 }
@@ -526,12 +573,18 @@ function getTaskListsAsync(projectId) {
         dispatch(startTaskListsFetch());
 
         // Get Tasklists from Firestore.
-        getFirestore().collection(_pounderFirebase.TASKLISTS).where("project", "==", projectId).onSnapshot(function (snapshot) {
-            var taskLists = [];
-            snapshot.forEach(function (doc) {
-                taskLists.push(doc.data());
-            });
-            dispatch(receiveTaskLists(taskLists));
+        getFirestore().collection(_pounderFirebase.TASKLISTS).where("project", "==", projectId).onSnapshot(_index2.IncludeQueryMetadataChanges, function (snapshot) {
+            // Handle Metadata.
+            dispatch(setTaskListsHavePendingWrites(snapshot.metadata.hasPendingWrites));
+
+            if (snapshot.docChanges.length > 0) {
+                var taskLists = [];
+                snapshot.forEach(function (doc) {
+                    taskLists.push(doc.data());
+                });
+
+                dispatch(receiveTaskLists(taskLists));
+            }
         });
     };
 }
@@ -540,18 +593,22 @@ function getProjectLayoutsAsync(projectId) {
     return function (dispatch, getState, getFirestore) {
         dispatch(startProjectLayoutsFetch());
 
-        getFirestore().collection(_pounderFirebase.PROJECTLAYOUTS).where("project", "==", projectId).onSnapshot(function (snapshot) {
-            var projectLayouts = [];
+        getFirestore().collection(_pounderFirebase.PROJECTLAYOUTS).where("project", "==", projectId).onSnapshot(_index2.IncludeQueryMetadataChanges, function (snapshot) {
+            // Handle Metadata.
+            dispatch(setProjectLayoutsHavePendingWrites(snapshot.metadata.hasPendingWrites));
 
-            if (snapshot.empty !== true) {
-                snapshot.forEach(function (doc) {
-                    projectLayouts.push(doc.data());
-                });
-            } else {
-                projectLayouts[0] = new _pounderStores.ProjectLayoutStore({}, -1, -1);
+            if (snapshot.docChanges.length > 0) {
+                var projectLayouts = [];
+                if (snapshot.empty !== true) {
+                    snapshot.forEach(function (doc) {
+                        projectLayouts.push(doc.data());
+                    });
+                } else {
+                    projectLayouts[0] = new _pounderStores.ProjectLayoutStore({}, -1, -1);
+                }
+
+                dispatch(receiveProjectLayout(projectLayouts[0]));
             }
-
-            dispatch(receiveProjectLayout(projectLayouts[0]));
         });
     };
 }
