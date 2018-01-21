@@ -30,6 +30,7 @@ exports.setProjectsHavePendingWrites = setProjectsHavePendingWrites;
 exports.setProjectLayoutsHavePendingWrites = setProjectLayoutsHavePendingWrites;
 exports.setTaskListsHavePendingWrites = setTaskListsHavePendingWrites;
 exports.setTasksHavePendingWrites = setTasksHavePendingWrites;
+exports.updateTaskPriority = updateTaskPriority;
 exports.updateTaskDueDateAsync = updateTaskDueDateAsync;
 exports.updateTaskListSettingsAsync = updateTaskListSettingsAsync;
 exports.removeTaskListAsync = removeTaskListAsync;
@@ -268,6 +269,20 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
+function updateTaskPriority(taskId, newValue) {
+    return function (dispatch, getState, getFirestore) {
+        dispatch(closeCalendar());
+
+        // Update Firestore.
+        var taskRef = getFirestore().collection(_pounderFirebase.TASKS).doc(taskId);
+        taskRef.update({
+            isHighPriority: newValue
+        }).then(function () {
+            // Careful what you do here, promises don't resolve if you are offline.
+        });
+    };
+}
+
 function updateTaskDueDateAsync(taskId, newDate) {
     return function (dispatch, getState, getFirestore) {
         dispatch(closeCalendar());

@@ -201,6 +201,21 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
+export function updateTaskPriority(taskId, newValue) {
+    return (dispatch, getState, getFirestore) => {
+        dispatch(closeCalendar());
+
+        // Update Firestore.
+        var taskRef = getFirestore().collection(TASKS).doc(taskId);
+        taskRef.update({
+            isHighPriority: newValue,
+        }).then(() => {
+            // Careful what you do here, promises don't resolve if you are offline.
+        })
+    }
+}
+
+
 export function updateTaskDueDateAsync(taskId, newDate) {
     return (dispatch, getState, getFirestore) => {
         dispatch(closeCalendar());
