@@ -516,7 +516,7 @@ function addNewTaskAsync() {
             var newTaskRef = getFirestore().collection(_pounderFirebase.TASKS).doc();
             var newTaskKey = newTaskRef.id;
 
-            var newTask = new _pounderStores.TaskStore("", "", false, selectedProjectId, focusedTaskListId, newTaskKey, new _moment2.default().toISOString(), true);
+            var newTask = new _pounderStores.TaskStore("", "", false, selectedProjectId, focusedTaskListId, newTaskKey, new _moment2.default().toISOString(), true, false);
 
             newTaskRef.set(Object.assign({}, newTask)).then(function () {});
 

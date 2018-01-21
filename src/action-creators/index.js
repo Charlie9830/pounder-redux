@@ -462,7 +462,8 @@ export function addNewTaskAsync() {
               focusedTaskListId,
               newTaskKey,
               new Moment().toISOString(),
-              true
+              true,
+              false
             )
       
             newTaskRef.set(Object.assign({}, newTask)).then(() => {
