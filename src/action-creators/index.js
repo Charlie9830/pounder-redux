@@ -189,6 +189,18 @@ export function setTasksHavePendingWrites(value) {
     }
 }
 
+export function openTaskListJumpMenu() {
+    return {
+        type: ActionTypes.OPEN_TASK_LIST_JUMP_MENU,
+    }
+}
+
+export function closeTaskListJumpMenu() {
+    return {
+        type: ActionTypes.CLOSE_TASK_LIST_JUMP_MENU,
+    }
+}
+
 // Private Actions.
 // Should only be dispatched by moveTaskAsync(), as moveTaskAsync() gets the movingTaskId from the State. Calling this from elsewhere
 // could create a race Condition.

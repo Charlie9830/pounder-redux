@@ -22,7 +22,8 @@ function appReducer(state, action) {
             return _extends({}, state, {
                 focusedTaskListId: action.id,
                 openCalendarId: -1,
-                openTaskListSettingsMenuId: -1
+                openTaskListSettingsMenuId: -1,
+                isTaskListJumpMenuOpen: false
             });
 
         case ActionTypes.SELECT_TASK:
@@ -35,7 +36,8 @@ function appReducer(state, action) {
                 movingTaskId: -1,
                 sourceTaskListId: -1,
                 openCalendarId: openCalendarId,
-                openTaskListSettingsMenuId: -1
+                openTaskListSettingsMenuId: -1,
+                isTaskListJumpMenuOpen: false
             });
 
         case ActionTypes.OPEN_TASK:
@@ -112,7 +114,8 @@ function appReducer(state, action) {
 
         case ActionTypes.SET_OPEN_TASKLIST_SETTINGS_MENU_ID:
             return _extends({}, state, {
-                openTaskListSettingsMenuId: action.id
+                openTaskListSettingsMenuId: action.id,
+                isTaskListJumpMenuOpen: false
             });
 
         case ActionTypes.OPEN_CALENDAR:
@@ -167,7 +170,8 @@ function appReducer(state, action) {
                 movingTaskId: -1,
                 sourceTaskListId: -1,
                 focusedTaskListId: -1,
-                openTaskListSettingsMenuId: -1
+                openTaskListSettingsMenuId: -1,
+                isTaskListJumpMenuOpen: false
             });
 
         case ActionTypes.CLOSE_CALENDAR:
@@ -193,6 +197,16 @@ function appReducer(state, action) {
         case ActionTypes.SET_TASKS_HAVE_PENDING_WRITES:
             return _extends({}, state, {
                 tasksHavePendingWrites: action.value
+            });
+
+        case ActionTypes.OPEN_TASK_LIST_JUMP_MENU:
+            return _extends({}, state, {
+                isTaskListJumpMenuOpen: true
+            });
+
+        case ActionTypes.CLOSE_TASK_LIST_JUMP_MENU:
+            return _extends({}, state, {
+                isTaskListJumpMenuOpen: false
             });
 
         default:

@@ -10,6 +10,7 @@ export function appReducer(state, action) {
                 focusedTaskListId: action.id,
                 openCalendarId: -1,
                 openTaskListSettingsMenuId: -1,
+                isTaskListJumpMenuOpen: false,
             };
         
         case ActionTypes.SELECT_TASK:
@@ -23,7 +24,8 @@ export function appReducer(state, action) {
                 movingTaskId: -1,
                 sourceTaskListId: -1,
                 openCalendarId: openCalendarId,
-                openTaskListSettingsMenuId: -1
+                openTaskListSettingsMenuId: -1,
+                isTaskListJumpMenuOpen: false,
             };
         
         case ActionTypes.OPEN_TASK:
@@ -112,7 +114,8 @@ export function appReducer(state, action) {
         case ActionTypes.SET_OPEN_TASKLIST_SETTINGS_MENU_ID: 
             return {
                 ...state,
-                openTaskListSettingsMenuId: action.id
+                openTaskListSettingsMenuId: action.id,
+                isTaskListJumpMenuOpen: false,
             }
         
         case ActionTypes.OPEN_CALENDAR: 
@@ -177,7 +180,8 @@ export function appReducer(state, action) {
                 movingTaskId: -1,
                 sourceTaskListId: -1,
                 focusedTaskListId: -1,
-                openTaskListSettingsMenuId: -1
+                openTaskListSettingsMenuId: -1,
+                isTaskListJumpMenuOpen: false,
             }
         
         case ActionTypes.CLOSE_CALENDAR:
@@ -210,6 +214,18 @@ export function appReducer(state, action) {
                 tasksHavePendingWrites: action.value,
             }
         
+        case ActionTypes.OPEN_TASK_LIST_JUMP_MENU:
+            return {
+                ...state,
+                isTaskListJumpMenuOpen: true,
+            }
+        
+        case ActionTypes.CLOSE_TASK_LIST_JUMP_MENU:
+            return {
+                ...state,
+                isTaskListJumpMenuOpen: false,
+            }
+
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);
             return state;

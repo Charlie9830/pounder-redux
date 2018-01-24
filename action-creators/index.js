@@ -30,6 +30,8 @@ exports.setProjectsHavePendingWrites = setProjectsHavePendingWrites;
 exports.setProjectLayoutsHavePendingWrites = setProjectLayoutsHavePendingWrites;
 exports.setTaskListsHavePendingWrites = setTaskListsHavePendingWrites;
 exports.setTasksHavePendingWrites = setTasksHavePendingWrites;
+exports.openTaskListJumpMenu = openTaskListJumpMenu;
+exports.closeTaskListJumpMenu = closeTaskListJumpMenu;
 exports.updateTaskPriority = updateTaskPriority;
 exports.updateTaskDueDateAsync = updateTaskDueDateAsync;
 exports.updateTaskListSettingsAsync = updateTaskListSettingsAsync;
@@ -254,6 +256,18 @@ function setTasksHavePendingWrites(value) {
     return {
         type: ActionTypes.SET_TASKS_HAVE_PENDING_WRITES,
         value: value
+    };
+}
+
+function openTaskListJumpMenu() {
+    return {
+        type: ActionTypes.OPEN_TASK_LIST_JUMP_MENU
+    };
+}
+
+function closeTaskListJumpMenu() {
+    return {
+        type: ActionTypes.CLOSE_TASK_LIST_JUMP_MENU
     };
 }
 

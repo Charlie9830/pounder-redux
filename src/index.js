@@ -42,10 +42,11 @@ var initialState = {
     projectLayoutsHavePendingWrites: false,
     taskListsHavePendingWrites: false,
     tasksHavePendingWrites: false,
+    isTaskListJumpMenuOpen: false,
 }
 
 export var appStore = createStore(
     appReducer,
     initialState,
-    applyMiddleware(ReduxThunk.withExtraArgument(getFirestore),/* Logger */)
+    applyMiddleware(ReduxThunk.withExtraArgument(getFirestore), Logger)
 );
