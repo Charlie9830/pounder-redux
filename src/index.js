@@ -48,5 +48,5 @@ var initialState = {
 export var appStore = createStore(
     appReducer,
     initialState,
-    applyMiddleware(ReduxThunk.withExtraArgument(getFirestore), Logger)
+    applyMiddleware(ReduxThunk.withExtraArgument(getFirestore), /* Logger */)
 );
