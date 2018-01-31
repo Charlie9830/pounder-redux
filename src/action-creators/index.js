@@ -201,6 +201,45 @@ export function closeTaskListJumpMenu() {
     }
 }
 
+export function setAuthMessage(message) {
+    return {
+        type: ActionTypes.SET_AUTH_MESSAGE,
+        message: message,
+    }
+}
+
+export function setLoggedInFlagTrue() {
+    return {
+        type: ActionTypes.SET_LOGGED_IN_FLAG_TRUE,
+    }
+}
+
+export function setLoggedInFlagFalse() {
+    return {
+        type: ActionTypes.SET_LOGGED_IN_FLAG_FALSE,
+    }
+}
+
+export function unloadUserData() {
+    return {
+        type: ActionTypes.UNLOAD_USER_DATA,
+    }
+}
+
+export function openAccountScreen() {
+    return {
+        type: ActionTypes.OPEN_ACCOUNT_SCREEN,
+    }
+}
+
+export function closeAccountScreen() {
+    return {
+        type: ActionTypes.CLOSE_ACCOUNT_SCREEN,
+    }
+}
+
+
+
 // Private Actions.
 // Should only be dispatched by moveTaskAsync(), as moveTaskAsync() gets the movingTaskId from the State. Calling this from elsewhere
 // could create a race Condition.
@@ -213,8 +252,54 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
+export function subscribeToAuth() {
+    return (dispatch, getState, { getFirestore, getAuth }) => {
+        getAuth().onAuthStateChanged( user => {
+            if (user) {
+                // User is Signed In
+                dispatch(setLoggedInFlagTrue());
+                dispatch(closeAccountScreen());
+                dispatch(getProjectsAsync());
+                dispatch(getTaskListsAsync());
+                dispatch(getTasksAsync());
+            }
+
+            else {
+                // User isn't Signed in.
+                dispatch(setLoggedInFlagFalse());
+                dispatch(unloadUserData());
+                dispatch(setAuthMessage("Logged Out"));
+            }
+        })
+    }
+}
+
+export function logInUser(email, password) {
+    return (dispatch, getState, { getFirestore, getAuth }) => {
+        dispatch(setAuthMessage("Logging In..."));
+
+        var parsedEmail = parseEmailAddress(email);
+        getAuth().signInWithEmailAndPassword(parsedEmail, password).catch(error => {
+            var message = "Error: " + error.code + "   " + error.message;
+            dispatch(setAuthMessage(message));
+        })
+    }
+}
+
+export function logOutUser() {
+    return (dispatch, getState, { getFirestore, getAuth }) => {
+        dispatch(setAuthMessage("Logging out..."));
+
+        getAuth().signOut().catch( error => {
+            var message = "Error: " + error.code + "   " + error.message;
+            dispatch(setAuthMessage(message));
+        })
+    }
+}
+
+
 export function updateTaskPriority(taskId, newValue) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(closeCalendar());
 
         // Update Firestore.
@@ -229,7 +314,7 @@ export function updateTaskPriority(taskId, newValue) {
 
 
 export function updateTaskDueDateAsync(taskId, newDate) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(closeCalendar());
 
         // Update Firestore.
@@ -244,7 +329,7 @@ export function updateTaskDueDateAsync(taskId, newDate) {
 }
 
 export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(setOpenTaskListSettingsMenuId(-1));
 
         // Update Firestore.
@@ -259,7 +344,7 @@ export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
 }
 
 export function removeTaskListAsync(taskListWidgetId) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         // Update Firestore.
         // Collect related TaskIds.
         var taskIds = collectTaskListRelatedTaskIds(getState().tasks, taskListWidgetId);
@@ -283,7 +368,7 @@ export function removeTaskListAsync(taskListWidgetId) {
 
 
 export function updateProjectNameAsync(projectId, newValue) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         // Update Firestore.
         var projectRef = getFirestore().collection(PROJECTS).doc(projectId);
         projectRef.update({ projectName: newValue }).then(() => {
@@ -293,7 +378,7 @@ export function updateProjectNameAsync(projectId, newValue) {
 }
 
 export function removeProjectAsync(projectId) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
         // been loaded in via the handleProjectSelectorClick method. No point in querying Firebase again for this data.
         var taskListIds = getState().taskLists.filter(item => {
@@ -333,7 +418,7 @@ export function removeProjectAsync(projectId) {
 
 
 export function addNewProjectAsync() {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         // Update Firestore.    
         var newProjectName = "New Project";
         var batch = getFirestore().batch();
@@ -362,7 +447,7 @@ export function addNewProjectAsync() {
 
 
 export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         if (getState().selectedTask.taskListWidgetId !== taskListWidgetId &&
             getState().selectedTask.taskId !== taskId) {
             dispatch(selectTask(taskListWidgetId, taskId));
@@ -381,7 +466,7 @@ export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
 }
 
 export function updateProjectLayoutAsync(layouts, projectId) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         var newTrimmedLayouts = trimLayoutsHelper(layouts);
         
         // Update Firestore.
@@ -394,7 +479,7 @@ export function updateProjectLayoutAsync(layouts, projectId) {
 
 
 export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(closeTask(taskListWidgetId, taskId));
 
         // TODO: Notify of Firebase Request.
@@ -410,7 +495,7 @@ export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
 }
 
 export function removeSelectedTaskAsync() {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         var taskId = getState().selectedTask.taskId;
         if (taskId !== -1) {
             // Update Firestore.    
@@ -428,7 +513,7 @@ export function removeSelectedTaskAsync() {
 
 
 export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         var taskListRef = getFirestore().collection(TASKLISTS).doc(taskListWidgetId);
         taskListRef.update({ taskListName: newName }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
@@ -438,7 +523,7 @@ export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
 
 
 export function moveTaskAsync(destinationTaskListId) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(startTaskMoveInDatabase());
 
         var movingTaskId = getState().movingTaskId;
@@ -455,7 +540,7 @@ export function moveTaskAsync(destinationTaskListId) {
 
 
 export function addNewTaskAsync() {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         if (getState().focusedTaskListId !== -1) {
 
             const { selectedProjectId, focusedTaskListId } = getState();
@@ -487,7 +572,7 @@ export function addNewTaskAsync() {
 }
 
 export function addNewTaskListAsync() {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(startTasklistAdd());
 
         // Add to Firestore.
@@ -508,7 +593,7 @@ export function addNewTaskListAsync() {
 }
 
 export function getProjectsAsync() {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(startProjectsFetch());
 
         // Get Projects from Firestore.
@@ -529,7 +614,7 @@ export function getProjectsAsync() {
 }
 
 export function getTasksAsync() {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(startTasksFetch());
 
         // Get Tasks from Firestore.
@@ -551,7 +636,7 @@ export function getTasksAsync() {
 }
 
 export function getTaskListsAsync(projectId) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(startTaskListsFetch());
 
         // Get Tasklists from Firestore.
@@ -572,7 +657,7 @@ export function getTaskListsAsync(projectId) {
 }
 
 export function getProjectLayoutsAsync(projectId) {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(startProjectLayoutsFetch());
 
         getFirestore().collection(PROJECTLAYOUTS).where("project", "==", projectId).onSnapshot( IncludeQueryMetadataChanges, snapshot => {
@@ -598,28 +683,28 @@ export function getProjectLayoutsAsync(projectId) {
 }
 
 export function unsubscribeProjectsAsync() {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         var projectUnsubscribe = getFirestore().collection(PROJECTS).onSnapshot( () => {});
         projectUnsubscribe();
     }
 }
 
 export function unsubscribeTaskListsAsync() {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         var taskListsUnsubscribe = getFirestore().collection(TASKLISTS).onSnapshot( () => {});
         taskListsUnsubscribe();
     }
 }
 
 export function unsubscribeTasksAsync() {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         var tasksUnsubscribe = getFirestore().collection(TASKS).onSnapshot( () => {});
         tasksUnsubscribe();
     }
 }
 
 export function unsubscribeProjectLayoutsAsync() {
-    return (dispatch, getState, getFirestore) => {
+    return (dispatch, getState, { getFirestore, getAuth } ) => {
         if (getState().selectedProjectId !== -1) {
             var projectLayoutsUnsubscribe = getFirestore().collection(PROJECTLAYOUTS).doc(getState().selectedProjectId).onSnapshot( () => {});
             projectLayoutsUnsubscribe();
@@ -628,6 +713,10 @@ export function unsubscribeProjectLayoutsAsync() {
 }
 
 // Helper Functions.
+function parseEmailAddress(email) {
+    return (email.trim()).toLowerCase();
+}
+
 function collectProjectRelatedTaskIds(tasks, projectId) {
     return tasks.filter(task => {
         return task.project === projectId

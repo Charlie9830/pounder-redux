@@ -2,7 +2,7 @@ import { createStore, applyMiddleware } from 'redux';
 import { appReducer } from './reducers/index';
 import Logger from 'redux-logger';
 import ReduxThunk from 'redux-thunk';
-import { setupFirebase, getFirestore } from 'pounder-firebase';
+import { setupFirebase, getFirestore, getAuth } from 'pounder-firebase';
 import { ProjectLayoutStore } from 'pounder-stores';
 
 export var IncludeQueryMetadataChanges = { includeQueryMetadataChanges: false }
@@ -43,10 +43,13 @@ var initialState = {
     taskListsHavePendingWrites: false,
     tasksHavePendingWrites: false,
     isTaskListJumpMenuOpen: false,
+    authMessage: "",
+    isUserLoggedIn: false,
+    isAccountScreenOpen: false,
 }
 
 export var appStore = createStore(
     appReducer,
     initialState,
-    applyMiddleware(ReduxThunk.withExtraArgument(getFirestore), /* Logger */)
+    applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth} ), /* Logger */)
 );

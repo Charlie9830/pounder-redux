@@ -1,5 +1,6 @@
 import * as ActionTypes from '../action-types/index'
 import { ParseDueDate } from 'pounder-utilities';
+import { ProjectLayoutStore } from 'pounder-stores';
 
 
 export function appReducer(state, action) {
@@ -224,6 +225,54 @@ export function appReducer(state, action) {
             return {
                 ...state,
                 isTaskListJumpMenuOpen: false,
+            }
+
+        case ActionTypes.SET_AUTH_MESSAGE:
+            return {
+                ...state,
+                authMessage: state.authMessage + '\n' + action.message,
+            }
+        
+        case ActionTypes.SET_LOGGED_IN_FLAG_TRUE:
+            return {
+                ...state,
+                isUserLoggedIn: true,
+            }
+
+        case ActionTypes.SET_LOGGED_IN_FLAG_FALSE:
+            return {
+                ...state,
+                isUserLoggedIn: false,
+            }
+        
+        case ActionTypes.UNLOAD_USER_DATA:
+            return {
+                ...state,
+                tasks: [],
+                taskLists: [],
+                projects: [],
+                projectLayout: new ProjectLayoutStore({}, -1, -1),
+                selectedProjectId: -1,
+                openCalendarId: -1,
+                selectedTask: { taskListWidgetId: -1, taskId: -1, isInputOpen: false },
+                isATaskMoving: false,
+                movingTaskId: -1,
+                sourceTaskListId: -1,
+                focusedTaskListId: -1,
+                openTaskListSettingsMenuId: -1,
+                isTaskListJumpMenuOpen: false,
+            }
+        
+        case ActionTypes.OPEN_ACCOUNT_SCREEN:
+            return {
+                ...state,
+                isAccountScreenOpen: true,
+            }
+        
+        case ActionTypes.CLOSE_ACCOUNT_SCREEN:
+            return {
+                ...state,
+                isAccountScreenOpen: false,
             }
 
         default:
