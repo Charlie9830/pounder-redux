@@ -262,24 +262,29 @@ export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
 
 export function removeTaskListAsync(taskListWidgetId) {
     return (dispatch, getState, { getFirestore, getAuth } ) => {
-        // Update Firestore.
-        // Collect related TaskIds.
-        var taskIds = collectTaskListRelatedTaskIds(getState().tasks, taskListWidgetId);
+        if (taskListWidgetId !== -1) {
+            // Update Firestore.
+            // Collect related TaskIds.
+            var taskIds = collectTaskListRelatedTaskIds(getState().tasks, taskListWidgetId);
 
-        // Build Batch.
-        var batch = getFirestore().batch();
+            // Build Batch.
+            var batch = getFirestore().batch();
 
-        // Task lists
-        batch.delete(getFirestore().collection(TASKLISTS).doc(taskListWidgetId));
+            // Task lists
+            batch.delete(getFirestore().collection(TASKLISTS).doc(taskListWidgetId));
 
-        // Tasks.
-        taskIds.forEach(id => {
-            batch.delete(getFirestore().collection(TASKS).doc(id));
-        })
+            // Tasks.
+            taskIds.forEach(id => {
+                batch.delete(getFirestore().collection(TASKS).doc(id));
+            })
 
-        batch.commit().then(() => {
-            // Carefull what you do here. Promises don't resolve if you are Offline.
-        })
+            batch.commit().then(() => {
+                // Carefull what you do here. Promises don't resolve if you are Offline.
+            })
+
+            dispatch(changeFocusedTaskList(-1));
+        }
+        
     }
 }
 
@@ -413,6 +418,7 @@ export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
 
 export function removeSelectedTaskAsync() {
     return (dispatch, getState, { getFirestore, getAuth } ) => {
+        
         var taskId = getState().selectedTask.taskId;
         if (taskId !== -1) {
             // Update Firestore.    
@@ -424,6 +430,8 @@ export function removeSelectedTaskAsync() {
             batch.commit().then(() => {
                 // Carefull what you do here, promises don't resolve if you are offline.
             });
+
+            dispatch(selectTask(getState().focusedTaskListId, -1));
         }
     }
 }
