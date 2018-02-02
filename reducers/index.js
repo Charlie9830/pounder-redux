@@ -211,48 +211,6 @@ function appReducer(state, action) {
                 isTaskListJumpMenuOpen: false
             });
 
-        case ActionTypes.SET_AUTH_MESSAGE:
-            return _extends({}, state, {
-                authMessage: state.authMessage + '\n' + action.message
-            });
-
-        case ActionTypes.SET_LOGGED_IN_FLAG_TRUE:
-            return _extends({}, state, {
-                isUserLoggedIn: true
-            });
-
-        case ActionTypes.SET_LOGGED_IN_FLAG_FALSE:
-            return _extends({}, state, {
-                isUserLoggedIn: false
-            });
-
-        case ActionTypes.UNLOAD_USER_DATA:
-            return _extends({}, state, {
-                tasks: [],
-                taskLists: [],
-                projects: [],
-                projectLayout: new _pounderStores.ProjectLayoutStore({}, -1, -1),
-                selectedProjectId: -1,
-                openCalendarId: -1,
-                selectedTask: { taskListWidgetId: -1, taskId: -1, isInputOpen: false },
-                isATaskMoving: false,
-                movingTaskId: -1,
-                sourceTaskListId: -1,
-                focusedTaskListId: -1,
-                openTaskListSettingsMenuId: -1,
-                isTaskListJumpMenuOpen: false
-            });
-
-        case ActionTypes.OPEN_ACCOUNT_SCREEN:
-            return _extends({}, state, {
-                isAccountScreenOpen: true
-            });
-
-        case ActionTypes.CLOSE_ACCOUNT_SCREEN:
-            return _extends({}, state, {
-                isAccountScreenOpen: false
-            });
-
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);
             return state;

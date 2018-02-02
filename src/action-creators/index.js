@@ -201,43 +201,6 @@ export function closeTaskListJumpMenu() {
     }
 }
 
-export function setAuthMessage(message) {
-    return {
-        type: ActionTypes.SET_AUTH_MESSAGE,
-        message: message,
-    }
-}
-
-export function setLoggedInFlagTrue() {
-    return {
-        type: ActionTypes.SET_LOGGED_IN_FLAG_TRUE,
-    }
-}
-
-export function setLoggedInFlagFalse() {
-    return {
-        type: ActionTypes.SET_LOGGED_IN_FLAG_FALSE,
-    }
-}
-
-export function unloadUserData() {
-    return {
-        type: ActionTypes.UNLOAD_USER_DATA,
-    }
-}
-
-export function openAccountScreen() {
-    return {
-        type: ActionTypes.OPEN_ACCOUNT_SCREEN,
-    }
-}
-
-export function closeAccountScreen() {
-    return {
-        type: ActionTypes.CLOSE_ACCOUNT_SCREEN,
-    }
-}
-
 
 
 // Private Actions.
@@ -252,52 +215,6 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
-export function subscribeToAuth() {
-    return (dispatch, getState, { getFirestore, getAuth }) => {
-        getAuth().onAuthStateChanged( user => {
-            if (user) {
-                // User is Signed In
-                dispatch(setLoggedInFlagTrue());
-                dispatch(closeAccountScreen());
-                dispatch(getProjectsAsync());
-                dispatch(getTaskListsAsync());
-                dispatch(getTasksAsync());
-            }
-
-            else {
-                // User isn't Signed in.
-                dispatch(setLoggedInFlagFalse());
-                dispatch(unloadUserData());
-                dispatch(setAuthMessage("Logged Out"));
-            }
-        })
-    }
-}
-
-export function logInUser(email, password) {
-    return (dispatch, getState, { getFirestore, getAuth }) => {
-        dispatch(setAuthMessage("Logging In..."));
-
-        var parsedEmail = parseEmailAddress(email);
-        getAuth().signInWithEmailAndPassword(parsedEmail, password).catch(error => {
-            var message = "Error: " + error.code + "   " + error.message;
-            dispatch(setAuthMessage(message));
-        })
-    }
-}
-
-export function logOutUser() {
-    return (dispatch, getState, { getFirestore, getAuth }) => {
-        dispatch(setAuthMessage("Logging out..."));
-
-        getAuth().signOut().catch( error => {
-            var message = "Error: " + error.code + "   " + error.message;
-            dispatch(setAuthMessage(message));
-        })
-    }
-}
-
-
 export function updateTaskPriority(taskId, newValue) {
     return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(closeCalendar());
@@ -713,10 +630,6 @@ export function unsubscribeProjectLayoutsAsync() {
 }
 
 // Helper Functions.
-function parseEmailAddress(email) {
-    return (email.trim()).toLowerCase();
-}
-
 function collectProjectRelatedTaskIds(tasks, projectId) {
     return tasks.filter(task => {
         return task.project === projectId

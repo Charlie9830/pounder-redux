@@ -43,9 +43,6 @@ var initialState = {
     taskListsHavePendingWrites: false,
     tasksHavePendingWrites: false,
     isTaskListJumpMenuOpen: false,
-    authMessage: "",
-    isUserLoggedIn: false,
-    isAccountScreenOpen: false,
 }
 
 export var appStore = createStore(

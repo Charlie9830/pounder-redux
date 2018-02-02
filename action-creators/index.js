@@ -32,15 +32,6 @@ exports.setTaskListsHavePendingWrites = setTaskListsHavePendingWrites;
 exports.setTasksHavePendingWrites = setTasksHavePendingWrites;
 exports.openTaskListJumpMenu = openTaskListJumpMenu;
 exports.closeTaskListJumpMenu = closeTaskListJumpMenu;
-exports.setAuthMessage = setAuthMessage;
-exports.setLoggedInFlagTrue = setLoggedInFlagTrue;
-exports.setLoggedInFlagFalse = setLoggedInFlagFalse;
-exports.unloadUserData = unloadUserData;
-exports.openAccountScreen = openAccountScreen;
-exports.closeAccountScreen = closeAccountScreen;
-exports.subscribeToAuth = subscribeToAuth;
-exports.logInUser = logInUser;
-exports.logOutUser = logOutUser;
 exports.updateTaskPriority = updateTaskPriority;
 exports.updateTaskDueDateAsync = updateTaskDueDateAsync;
 exports.updateTaskListSettingsAsync = updateTaskListSettingsAsync;
@@ -280,43 +271,6 @@ function closeTaskListJumpMenu() {
     };
 }
 
-function setAuthMessage(message) {
-    return {
-        type: ActionTypes.SET_AUTH_MESSAGE,
-        message: message
-    };
-}
-
-function setLoggedInFlagTrue() {
-    return {
-        type: ActionTypes.SET_LOGGED_IN_FLAG_TRUE
-    };
-}
-
-function setLoggedInFlagFalse() {
-    return {
-        type: ActionTypes.SET_LOGGED_IN_FLAG_FALSE
-    };
-}
-
-function unloadUserData() {
-    return {
-        type: ActionTypes.UNLOAD_USER_DATA
-    };
-}
-
-function openAccountScreen() {
-    return {
-        type: ActionTypes.OPEN_ACCOUNT_SCREEN
-    };
-}
-
-function closeAccountScreen() {
-    return {
-        type: ActionTypes.CLOSE_ACCOUNT_SCREEN
-    };
-}
-
 // Private Actions.
 // Should only be dispatched by moveTaskAsync(), as moveTaskAsync() gets the movingTaskId from the State. Calling this from elsewhere
 // could create a race Condition.
@@ -329,62 +283,10 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
-function subscribeToAuth() {
+function updateTaskPriority(taskId, newValue) {
     return function (dispatch, getState, _ref) {
         var getFirestore = _ref.getFirestore,
             getAuth = _ref.getAuth;
-
-        getAuth().onAuthStateChanged(function (user) {
-            if (user) {
-                // User is Signed In
-                dispatch(setLoggedInFlagTrue());
-                dispatch(closeAccountScreen());
-                dispatch(getProjectsAsync());
-                dispatch(getTaskListsAsync());
-                dispatch(getTasksAsync());
-            } else {
-                // User isn't Signed in.
-                dispatch(setLoggedInFlagFalse());
-                dispatch(unloadUserData());
-                dispatch(setAuthMessage("Logged Out"));
-            }
-        });
-    };
-}
-
-function logInUser(email, password) {
-    return function (dispatch, getState, _ref2) {
-        var getFirestore = _ref2.getFirestore,
-            getAuth = _ref2.getAuth;
-
-        dispatch(setAuthMessage("Logging In..."));
-
-        var parsedEmail = parseEmailAddress(email);
-        getAuth().signInWithEmailAndPassword(parsedEmail, password).catch(function (error) {
-            var message = "Error: " + error.code + "   " + error.message;
-            dispatch(setAuthMessage(message));
-        });
-    };
-}
-
-function logOutUser() {
-    return function (dispatch, getState, _ref3) {
-        var getFirestore = _ref3.getFirestore,
-            getAuth = _ref3.getAuth;
-
-        dispatch(setAuthMessage("Logging out..."));
-
-        getAuth().signOut().catch(function (error) {
-            var message = "Error: " + error.code + "   " + error.message;
-            dispatch(setAuthMessage(message));
-        });
-    };
-}
-
-function updateTaskPriority(taskId, newValue) {
-    return function (dispatch, getState, _ref4) {
-        var getFirestore = _ref4.getFirestore,
-            getAuth = _ref4.getAuth;
 
         dispatch(closeCalendar());
 
@@ -399,9 +301,9 @@ function updateTaskPriority(taskId, newValue) {
 }
 
 function updateTaskDueDateAsync(taskId, newDate) {
-    return function (dispatch, getState, _ref5) {
-        var getFirestore = _ref5.getFirestore,
-            getAuth = _ref5.getAuth;
+    return function (dispatch, getState, _ref2) {
+        var getFirestore = _ref2.getFirestore,
+            getAuth = _ref2.getAuth;
 
         dispatch(closeCalendar());
 
@@ -417,9 +319,9 @@ function updateTaskDueDateAsync(taskId, newDate) {
 }
 
 function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
-    return function (dispatch, getState, _ref6) {
-        var getFirestore = _ref6.getFirestore,
-            getAuth = _ref6.getAuth;
+    return function (dispatch, getState, _ref3) {
+        var getFirestore = _ref3.getFirestore,
+            getAuth = _ref3.getAuth;
 
         dispatch(setOpenTaskListSettingsMenuId(-1));
 
@@ -435,9 +337,9 @@ function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
 }
 
 function removeTaskListAsync(taskListWidgetId) {
-    return function (dispatch, getState, _ref7) {
-        var getFirestore = _ref7.getFirestore,
-            getAuth = _ref7.getAuth;
+    return function (dispatch, getState, _ref4) {
+        var getFirestore = _ref4.getFirestore,
+            getAuth = _ref4.getAuth;
 
         // Update Firestore.
         // Collect related TaskIds.
@@ -461,9 +363,9 @@ function removeTaskListAsync(taskListWidgetId) {
 }
 
 function updateProjectNameAsync(projectId, newValue) {
-    return function (dispatch, getState, _ref8) {
-        var getFirestore = _ref8.getFirestore,
-            getAuth = _ref8.getAuth;
+    return function (dispatch, getState, _ref5) {
+        var getFirestore = _ref5.getFirestore,
+            getAuth = _ref5.getAuth;
 
         // Update Firestore.
         var projectRef = getFirestore().collection(_pounderFirebase.PROJECTS).doc(projectId);
@@ -474,9 +376,9 @@ function updateProjectNameAsync(projectId, newValue) {
 }
 
 function removeProjectAsync(projectId) {
-    return function (dispatch, getState, _ref9) {
-        var getFirestore = _ref9.getFirestore,
-            getAuth = _ref9.getAuth;
+    return function (dispatch, getState, _ref6) {
+        var getFirestore = _ref6.getFirestore,
+            getAuth = _ref6.getAuth;
 
         // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
         // been loaded in via the handleProjectSelectorClick method. No point in querying Firebase again for this data.
@@ -518,9 +420,9 @@ function removeProjectAsync(projectId) {
 }
 
 function addNewProjectAsync() {
-    return function (dispatch, getState, _ref10) {
-        var getFirestore = _ref10.getFirestore,
-            getAuth = _ref10.getAuth;
+    return function (dispatch, getState, _ref7) {
+        var getFirestore = _ref7.getFirestore,
+            getAuth = _ref7.getAuth;
 
         // Update Firestore.    
         var newProjectName = "New Project";
@@ -547,9 +449,9 @@ function addNewProjectAsync() {
 }
 
 function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
-    return function (dispatch, getState, _ref11) {
-        var getFirestore = _ref11.getFirestore,
-            getAuth = _ref11.getAuth;
+    return function (dispatch, getState, _ref8) {
+        var getFirestore = _ref8.getFirestore,
+            getAuth = _ref8.getAuth;
 
         if (getState().selectedTask.taskListWidgetId !== taskListWidgetId && getState().selectedTask.taskId !== taskId) {
             dispatch(selectTask(taskListWidgetId, taskId));
@@ -568,9 +470,9 @@ function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
 }
 
 function updateProjectLayoutAsync(layouts, projectId) {
-    return function (dispatch, getState, _ref12) {
-        var getFirestore = _ref12.getFirestore,
-            getAuth = _ref12.getAuth;
+    return function (dispatch, getState, _ref9) {
+        var getFirestore = _ref9.getFirestore,
+            getAuth = _ref9.getAuth;
 
         var newTrimmedLayouts = trimLayoutsHelper(layouts);
 
@@ -583,9 +485,9 @@ function updateProjectLayoutAsync(layouts, projectId) {
 }
 
 function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
-    return function (dispatch, getState, _ref13) {
-        var getFirestore = _ref13.getFirestore,
-            getAuth = _ref13.getAuth;
+    return function (dispatch, getState, _ref10) {
+        var getFirestore = _ref10.getFirestore,
+            getAuth = _ref10.getAuth;
 
         dispatch(closeTask(taskListWidgetId, taskId));
 
@@ -602,9 +504,9 @@ function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
 }
 
 function removeSelectedTaskAsync() {
-    return function (dispatch, getState, _ref14) {
-        var getFirestore = _ref14.getFirestore,
-            getAuth = _ref14.getAuth;
+    return function (dispatch, getState, _ref11) {
+        var getFirestore = _ref11.getFirestore,
+            getAuth = _ref11.getAuth;
 
         var taskId = getState().selectedTask.taskId;
         if (taskId !== -1) {
@@ -622,9 +524,9 @@ function removeSelectedTaskAsync() {
 }
 
 function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
-    return function (dispatch, getState, _ref15) {
-        var getFirestore = _ref15.getFirestore,
-            getAuth = _ref15.getAuth;
+    return function (dispatch, getState, _ref12) {
+        var getFirestore = _ref12.getFirestore,
+            getAuth = _ref12.getAuth;
 
         var taskListRef = getFirestore().collection(_pounderFirebase.TASKLISTS).doc(taskListWidgetId);
         taskListRef.update({ taskListName: newName }).then(function () {
@@ -634,9 +536,9 @@ function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
 }
 
 function moveTaskAsync(destinationTaskListId) {
-    return function (dispatch, getState, _ref16) {
-        var getFirestore = _ref16.getFirestore,
-            getAuth = _ref16.getAuth;
+    return function (dispatch, getState, _ref13) {
+        var getFirestore = _ref13.getFirestore,
+            getAuth = _ref13.getAuth;
 
         dispatch(startTaskMoveInDatabase());
 
@@ -653,9 +555,9 @@ function moveTaskAsync(destinationTaskListId) {
 }
 
 function addNewTaskAsync() {
-    return function (dispatch, getState, _ref17) {
-        var getFirestore = _ref17.getFirestore,
-            getAuth = _ref17.getAuth;
+    return function (dispatch, getState, _ref14) {
+        var getFirestore = _ref14.getFirestore,
+            getAuth = _ref14.getAuth;
 
         if (getState().focusedTaskListId !== -1) {
             var _getState = getState(),
@@ -680,9 +582,9 @@ function addNewTaskAsync() {
 }
 
 function addNewTaskListAsync() {
-    return function (dispatch, getState, _ref18) {
-        var getFirestore = _ref18.getFirestore,
-            getAuth = _ref18.getAuth;
+    return function (dispatch, getState, _ref15) {
+        var getFirestore = _ref15.getFirestore,
+            getAuth = _ref15.getAuth;
 
         dispatch(startTasklistAdd());
 
@@ -698,9 +600,9 @@ function addNewTaskListAsync() {
 }
 
 function getProjectsAsync() {
-    return function (dispatch, getState, _ref19) {
-        var getFirestore = _ref19.getFirestore,
-            getAuth = _ref19.getAuth;
+    return function (dispatch, getState, _ref16) {
+        var getFirestore = _ref16.getFirestore,
+            getAuth = _ref16.getAuth;
 
         dispatch(startProjectsFetch());
 
@@ -722,9 +624,9 @@ function getProjectsAsync() {
 }
 
 function getTasksAsync() {
-    return function (dispatch, getState, _ref20) {
-        var getFirestore = _ref20.getFirestore,
-            getAuth = _ref20.getAuth;
+    return function (dispatch, getState, _ref17) {
+        var getFirestore = _ref17.getFirestore,
+            getAuth = _ref17.getAuth;
 
         dispatch(startTasksFetch());
 
@@ -747,9 +649,9 @@ function getTasksAsync() {
 }
 
 function getTaskListsAsync(projectId) {
-    return function (dispatch, getState, _ref21) {
-        var getFirestore = _ref21.getFirestore,
-            getAuth = _ref21.getAuth;
+    return function (dispatch, getState, _ref18) {
+        var getFirestore = _ref18.getFirestore,
+            getAuth = _ref18.getAuth;
 
         dispatch(startTaskListsFetch());
 
@@ -771,9 +673,9 @@ function getTaskListsAsync(projectId) {
 }
 
 function getProjectLayoutsAsync(projectId) {
-    return function (dispatch, getState, _ref22) {
-        var getFirestore = _ref22.getFirestore,
-            getAuth = _ref22.getAuth;
+    return function (dispatch, getState, _ref19) {
+        var getFirestore = _ref19.getFirestore,
+            getAuth = _ref19.getAuth;
 
         dispatch(startProjectLayoutsFetch());
 
@@ -798,9 +700,9 @@ function getProjectLayoutsAsync(projectId) {
 }
 
 function unsubscribeProjectsAsync() {
-    return function (dispatch, getState, _ref23) {
-        var getFirestore = _ref23.getFirestore,
-            getAuth = _ref23.getAuth;
+    return function (dispatch, getState, _ref20) {
+        var getFirestore = _ref20.getFirestore,
+            getAuth = _ref20.getAuth;
 
         var projectUnsubscribe = getFirestore().collection(_pounderFirebase.PROJECTS).onSnapshot(function () {});
         projectUnsubscribe();
@@ -808,9 +710,9 @@ function unsubscribeProjectsAsync() {
 }
 
 function unsubscribeTaskListsAsync() {
-    return function (dispatch, getState, _ref24) {
-        var getFirestore = _ref24.getFirestore,
-            getAuth = _ref24.getAuth;
+    return function (dispatch, getState, _ref21) {
+        var getFirestore = _ref21.getFirestore,
+            getAuth = _ref21.getAuth;
 
         var taskListsUnsubscribe = getFirestore().collection(_pounderFirebase.TASKLISTS).onSnapshot(function () {});
         taskListsUnsubscribe();
@@ -818,9 +720,9 @@ function unsubscribeTaskListsAsync() {
 }
 
 function unsubscribeTasksAsync() {
-    return function (dispatch, getState, _ref25) {
-        var getFirestore = _ref25.getFirestore,
-            getAuth = _ref25.getAuth;
+    return function (dispatch, getState, _ref22) {
+        var getFirestore = _ref22.getFirestore,
+            getAuth = _ref22.getAuth;
 
         var tasksUnsubscribe = getFirestore().collection(_pounderFirebase.TASKS).onSnapshot(function () {});
         tasksUnsubscribe();
@@ -828,9 +730,9 @@ function unsubscribeTasksAsync() {
 }
 
 function unsubscribeProjectLayoutsAsync() {
-    return function (dispatch, getState, _ref26) {
-        var getFirestore = _ref26.getFirestore,
-            getAuth = _ref26.getAuth;
+    return function (dispatch, getState, _ref23) {
+        var getFirestore = _ref23.getFirestore,
+            getAuth = _ref23.getAuth;
 
         if (getState().selectedProjectId !== -1) {
             var projectLayoutsUnsubscribe = getFirestore().collection(_pounderFirebase.PROJECTLAYOUTS).doc(getState().selectedProjectId).onSnapshot(function () {});
@@ -840,10 +742,6 @@ function unsubscribeProjectLayoutsAsync() {
 }
 
 // Helper Functions.
-function parseEmailAddress(email) {
-    return email.trim().toLowerCase();
-}
-
 function collectProjectRelatedTaskIds(tasks, projectId) {
     return tasks.filter(function (task) {
         return task.project === projectId;
