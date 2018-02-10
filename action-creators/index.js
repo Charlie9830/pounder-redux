@@ -384,42 +384,45 @@ function removeProjectAsync(projectId) {
         var getFirestore = _ref6.getFirestore,
             getAuth = _ref6.getAuth;
 
-        // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
-        // been loaded in via the handleProjectSelectorClick method. No point in querying Firebase again for this data.
-        var taskListIds = getState().taskLists.filter(function (item) {
-            return item.project === projectId;
-        }).map(function (taskList) {
-            return taskList.uid;
-        });
 
-        var taskIds = collectProjectRelatedTaskIds(getState().tasks, projectId);
+        if (getState.selectedProjectId !== -1) {
+            // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
+            // been loaded in via the handleProjectSelectorClick method. No point in querying Firebase again for this data.
+            var taskListIds = getState().taskLists.filter(function (item) {
+                return item.project === projectId;
+            }).map(function (taskList) {
+                return taskList.uid;
+            });
 
-        // Build Updates.
-        var batch = getFirestore().batch();
+            var taskIds = collectProjectRelatedTaskIds(getState().tasks, projectId);
 
-        // Tasklists.
-        taskListIds.forEach(function (id) {
-            batch.delete(getFirestore().collection(_pounderFirebase.TASKLISTS).doc(id));
-        });
+            // Build Updates.
+            var batch = getFirestore().batch();
 
-        // Tasks
-        taskIds.forEach(function (id) {
-            batch.delete(getFirestore().collection(_pounderFirebase.TASKS).doc(id));
-        });
+            // Tasklists.
+            taskListIds.forEach(function (id) {
+                batch.delete(getFirestore().collection(_pounderFirebase.TASKLISTS).doc(id));
+            });
 
-        // Project Layout
-        var projectLayoutId = getState().projectLayout.uid;
-        if (projectLayoutId !== -1) {
-            batch.delete(getFirestore().collection(_pounderFirebase.PROJECTLAYOUTS).doc(projectLayoutId));
+            // Tasks
+            taskIds.forEach(function (id) {
+                batch.delete(getFirestore().collection(_pounderFirebase.TASKS).doc(id));
+            });
+
+            // Project Layout
+            var projectLayoutId = getState().projectLayout.uid;
+            if (projectLayoutId !== -1) {
+                batch.delete(getFirestore().collection(_pounderFirebase.PROJECTLAYOUTS).doc(projectLayoutId));
+            }
+
+            // Project.
+            batch.delete(getFirestore().collection(_pounderFirebase.PROJECTS).doc(projectId));
+
+            // Execute the Batch.
+            batch.commit().then(function () {
+                // Carefull what you do here, promises don't resolve if you are offline.
+            });
         }
-
-        // Project.
-        batch.delete(getFirestore().collection(_pounderFirebase.PROJECTS).doc(projectId));
-
-        // Execute the Batch.
-        batch.commit().then(function () {
-            // Carefull what you do here, promises don't resolve if you are offline.
-        });
     };
 }
 
@@ -571,19 +574,19 @@ function addNewTaskAsync() {
                 selectedProjectId = _getState.selectedProjectId,
                 focusedTaskListId = _getState.focusedTaskListId;
 
-            // Add a new Task.
+            if (selectedProjectId !== -1 && focusedTaskListId !== -1) {
+                // Add a new Task.
+                dispatch(startTaskAdd());
 
+                var newTaskRef = getFirestore().collection(_pounderFirebase.TASKS).doc();
+                var newTaskKey = newTaskRef.id;
 
-            dispatch(startTaskAdd());
+                var newTask = new _pounderStores.TaskStore("", "", false, selectedProjectId, focusedTaskListId, newTaskKey, new _moment2.default().toISOString(), true, false);
 
-            var newTaskRef = getFirestore().collection(_pounderFirebase.TASKS).doc();
-            var newTaskKey = newTaskRef.id;
+                newTaskRef.set(Object.assign({}, newTask)).then(function () {});
 
-            var newTask = new _pounderStores.TaskStore("", "", false, selectedProjectId, focusedTaskListId, newTaskKey, new _moment2.default().toISOString(), true, false);
-
-            newTaskRef.set(Object.assign({}, newTask)).then(function () {});
-
-            dispatch(openTask(newTask.taskList, newTask.uid)); // Opening a Task by convention Selects it.
+                dispatch(openTask(newTask.taskList, newTask.uid)); // Opening a Task by convention Selects it.
+            }
         }
     };
 }
@@ -595,14 +598,18 @@ function addNewTaskListAsync() {
 
         dispatch(startTasklistAdd());
 
-        // Add to Firestore.
-        var newTaskListRef = getFirestore().collection(_pounderFirebase.TASKLISTS).doc();
+        var selectedProjectId = getState().selectedProjectId;
 
-        var newTaskList = new _pounderStores.TaskListStore("New Task List", getState().selectedProjectId, newTaskListRef.id, newTaskListRef.id, Object.assign({}, new _pounderStores.TaskListSettingsStore(true, "completed")));
+        if (selectedProjectId !== -1) {
+            // Add to Firestore.
+            var newTaskListRef = getFirestore().collection(_pounderFirebase.TASKLISTS).doc();
 
-        newTaskListRef.set(Object.assign({}, newTaskList)).then(function () {
-            // Carefull what you do here, promises don't resolve if you are offline.
-        });
+            var newTaskList = new _pounderStores.TaskListStore("New Task List", selectedProjectId, newTaskListRef.id, newTaskListRef.id, Object.assign({}, new _pounderStores.TaskListSettingsStore(true, "completed")));
+
+            newTaskListRef.set(Object.assign({}, newTaskList)).then(function () {
+                // Carefull what you do here, promises don't resolve if you are offline.
+            });
+        }
     };
 }
 

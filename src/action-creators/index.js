@@ -301,40 +301,43 @@ export function updateProjectNameAsync(projectId, newValue) {
 
 export function removeProjectAsync(projectId) {
     return (dispatch, getState, { getFirestore, getAuth } ) => {
-        // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
-        // been loaded in via the handleProjectSelectorClick method. No point in querying Firebase again for this data.
-        var taskListIds = getState().taskLists.filter(item => {
-            return item.project === projectId;
-        }).map(taskList => { return taskList.uid });
 
-        var taskIds = collectProjectRelatedTaskIds(getState().tasks, projectId);
+        if (getState.selectedProjectId !== -1) {
+            // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
+            // been loaded in via the handleProjectSelectorClick method. No point in querying Firebase again for this data.
+            var taskListIds = getState().taskLists.filter(item => {
+                return item.project === projectId;
+            }).map(taskList => { return taskList.uid });
 
-        // Build Updates.
-        var batch = getFirestore().batch();
+            var taskIds = collectProjectRelatedTaskIds(getState().tasks, projectId);
 
-        // Tasklists.
-        taskListIds.forEach(id => {
-            batch.delete(getFirestore().collection(TASKLISTS).doc(id));
-        })
+            // Build Updates.
+            var batch = getFirestore().batch();
 
-        // Tasks
-        taskIds.forEach(id => {
-            batch.delete(getFirestore().collection(TASKS).doc(id));
-        })
+            // Tasklists.
+            taskListIds.forEach(id => {
+                batch.delete(getFirestore().collection(TASKLISTS).doc(id));
+            })
 
-        // Project Layout
-        var projectLayoutId = getState().projectLayout.uid;
-        if (projectLayoutId !== -1) {
-            batch.delete(getFirestore().collection(PROJECTLAYOUTS).doc(projectLayoutId));
+            // Tasks
+            taskIds.forEach(id => {
+                batch.delete(getFirestore().collection(TASKS).doc(id));
+            })
+
+            // Project Layout
+            var projectLayoutId = getState().projectLayout.uid;
+            if (projectLayoutId !== -1) {
+                batch.delete(getFirestore().collection(PROJECTLAYOUTS).doc(projectLayoutId));
+            }
+
+            // Project.
+            batch.delete(getFirestore().collection(PROJECTS).doc(projectId));
+
+            // Execute the Batch.
+            batch.commit().then(() => {
+                // Carefull what you do here, promises don't resolve if you are offline.
+            })
         }
-        
-        // Project.
-        batch.delete(getFirestore().collection(PROJECTS).doc(projectId));
-
-        // Execute the Batch.
-        batch.commit().then(() => {
-            // Carefull what you do here, promises don't resolve if you are offline.
-        })
     }
 }
 
@@ -470,7 +473,8 @@ export function addNewTaskAsync() {
 
             const { selectedProjectId, focusedTaskListId } = getState();
 
-            // Add a new Task.
+            if (selectedProjectId !== -1 && focusedTaskListId !== -1) {
+                // Add a new Task.
             dispatch(startTaskAdd());
 
             var newTaskRef = getFirestore().collection(TASKS).doc();
@@ -492,6 +496,8 @@ export function addNewTaskAsync() {
             })
 
             dispatch(openTask(newTask.taskList, newTask.uid)); // Opening a Task by convention Selects it.
+
+            }
         }    
     }
 }
@@ -500,20 +506,24 @@ export function addNewTaskListAsync() {
     return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(startTasklistAdd());
 
-        // Add to Firestore.
-        var newTaskListRef = getFirestore().collection(TASKLISTS).doc();
-        
-        var newTaskList = new TaskListStore(
-          "New Task List",
-          getState().selectedProjectId,
-          newTaskListRef.id,
-          newTaskListRef.id,
-          Object.assign({}, new TaskListSettingsStore(true, "completed"))
-        )
+        var selectedProjectId = getState().selectedProjectId;
 
-        newTaskListRef.set(Object.assign({},newTaskList)).then(() => {
-            // Carefull what you do here, promises don't resolve if you are offline.
-        })
+        if (selectedProjectId !== -1) {
+            // Add to Firestore.
+            var newTaskListRef = getFirestore().collection(TASKLISTS).doc();
+
+            var newTaskList = new TaskListStore(
+                "New Task List",
+                selectedProjectId,
+                newTaskListRef.id,
+                newTaskListRef.id,
+                Object.assign({}, new TaskListSettingsStore(true, "completed"))
+            )
+
+            newTaskListRef.set(Object.assign({}, newTaskList)).then(() => {
+                // Carefull what you do here, promises don't resolve if you are offline.
+            })
+        } 
     }
 }
 
