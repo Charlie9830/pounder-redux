@@ -240,7 +240,7 @@ var getProjectSelectorDueDateDisplaysHelper = function(tasks) {
     tasks.forEach(item => {
       if (item.dueDate !== "" && item.isComplete !== true) {
         if (returnList[item.project] == undefined) {
-          returnList[item.project] = {greens: 0, yellows: 0, reds: 0};
+          returnList[item.project] = {greens: 0, yellows: 0, yellowReds: 0, reds: 0};
         }
 
         var {className} = ParseDueDate(item.isComplete, item.dueDate);
@@ -252,6 +252,9 @@ var getProjectSelectorDueDateDisplaysHelper = function(tasks) {
           case "DueDate Soon":
             returnList[item.project].yellows += 1;
             break;
+
+          case "DueDate Today":
+            returnList[item.project].yellowReds += 1;
 
           case "DueDate Overdue":
             returnList[item.project].reds += 1;
