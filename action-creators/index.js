@@ -3,6 +3,9 @@
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
+
+var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
+
 exports.changeFocusedTaskList = changeFocusedTaskList;
 exports.selectTask = selectTask;
 exports.openTask = openTask;
@@ -70,9 +73,22 @@ var _moment2 = _interopRequireDefault(_moment);
 
 var _index2 = require('../index');
 
+var _minimist = require('minimist');
+
+var _minimist2 = _interopRequireDefault(_minimist);
+
+var _stringArgv = require('string-argv');
+
+var _stringArgv2 = _interopRequireDefault(_stringArgv);
+
+var _pounderUtilities = require('pounder-utilities');
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+
+var legalArgsRegEx = / -dd | -hp /i;
+var dateFormat = "DD-MM-YYYY";
 
 // Standard Action Creators.
 function changeFocusedTaskList(id) {
@@ -499,12 +515,18 @@ function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
         dispatch(closeTask(taskListWidgetId, taskId));
 
         // TODO: Notify of Firebase Request.
-        // Update Firestore.
-        var taskRef = getFirestore().collection(_pounderFirebase.TASKS).doc(taskId);
-        taskRef.update({
+
+        var update = {
             taskName: newData,
             isNewTask: false // Reset new Task Property.
-        }).then(function () {
+
+
+            // Returns a new Update Object with arguments parsed in (if any);
+        };var newUpdate = parseArgumentsIntoUpdate(update);
+
+        // Update Firestore.
+        var taskRef = getFirestore().collection(_pounderFirebase.TASKS).doc(taskId);
+        taskRef.update(newUpdate).then(function () {
             // Carefull what you do here, promises don't resolve if you are offline.
         });
     };
@@ -756,6 +778,69 @@ function unsubscribeProjectLayoutsAsync() {
 }
 
 // Helper Functions.
+function parseArgumentsIntoUpdate(update) {
+    // Convert string into args array.
+    var args = (0, _stringArgv2.default)(update.taskName);
+
+    // Parse arguments.
+    var argv = (0, _minimist2.default)(args);
+    console.log("Argv ===");
+    console.log(argv);
+
+    var parsedUpdate = _extends({}, update);
+
+    // dueDate.
+    if (argv.d !== undefined) {
+        parsedUpdate.dueDate = parseDateArgument(argv.d);
+    }
+
+    // isHighPriority
+    if (argv.p !== undefined) {
+        parsedUpdate.isHighPriority = true;
+    }
+
+    // Use text ignored by parseArgs to rebuild taskName.
+    parsedUpdate.taskName = argv._.join(" ");
+
+    return parsedUpdate;
+}
+
+function parseDateArgument(d) {
+    // Clear Due Date.
+    if (d === true) {
+        // Clear due Date.
+        return "";
+    }
+
+    // Number without 'd' suffix.
+    if (typeof d === "number") {
+        // Assume user means Days.
+        return (0, _pounderUtilities.getDaysForwardDate)(d);
+    }
+
+    // Today.
+    else if (d === "today" || d === "Today") {
+            return (0, _pounderUtilities.getDaysForwardDate)(0);
+        }
+
+        // Tomomrrow - Catch mispellings as well.
+        else if (d.includes('tom') || d.includes('Tom')) {
+                return (0, _pounderUtilities.getDaysForwardDate)(1);
+            }
+
+            // Days Forward.
+            else if (d.includes('d')) {
+                    return (0, _pounderUtilities.getDaysForwardDate)(d.slice(0, d.length - 1));
+                }
+
+                // Weeks Forward.
+                else if (d.includes('w')) {
+                        return (0, _pounderUtilities.getWeeksForwardDate)(d.slice(0, d.length - 1));
+                    }
+
+    return "";
+}
+
 function collectProjectRelatedTaskIds(tasks, projectId) {
     return tasks.filter(function (task) {
         return task.project === projectId;
