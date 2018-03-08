@@ -5,7 +5,7 @@ import Moment from 'moment';
 import { IncludeQueryMetadataChanges } from '../index';
 import parseArgs from 'minimist';
 import stringArgv from 'string-argv';
-import { getDayPickerDate, getClearedDate, getDaysForwardDate, getWeeksForwardDate } from 'pounder-utilities';
+import { getDayPickerDate, getClearedDate, getDaysForwardDate, getWeeksForwardDate, getParsedDate } from 'pounder-utilities';
 
 const legalArgsRegEx = / -dd | -hp /i;
 const dateFormat = "DD-MM-YYYY";
@@ -709,6 +709,11 @@ function parseDateArgument(d) {
     // Tomomrrow - Catch mispellings as well.
     else if (d.includes('tom') || d.includes('Tom')) {
         return getDaysForwardDate(1);
+    }
+
+    // Date
+    else if (d.includes('/')) {
+        return getParsedDate(d);
     }
 
     // Days Forward.

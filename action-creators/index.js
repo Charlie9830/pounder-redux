@@ -828,15 +828,20 @@ function parseDateArgument(d) {
                 return (0, _pounderUtilities.getDaysForwardDate)(1);
             }
 
-            // Days Forward.
-            else if (d.includes('d')) {
-                    return (0, _pounderUtilities.getDaysForwardDate)(d.slice(0, d.length - 1));
+            // Date
+            else if (d.includes('/')) {
+                    return (0, _pounderUtilities.getParsedDate)(d);
                 }
 
-                // Weeks Forward.
-                else if (d.includes('w')) {
-                        return (0, _pounderUtilities.getWeeksForwardDate)(d.slice(0, d.length - 1));
+                // Days Forward.
+                else if (d.includes('d')) {
+                        return (0, _pounderUtilities.getDaysForwardDate)(d.slice(0, d.length - 1));
                     }
+
+                    // Weeks Forward.
+                    else if (d.includes('w')) {
+                            return (0, _pounderUtilities.getWeeksForwardDate)(d.slice(0, d.length - 1));
+                        }
 
     return "";
 }
