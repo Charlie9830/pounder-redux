@@ -779,13 +779,16 @@ function unsubscribeProjectLayoutsAsync() {
 
 // Helper Functions.
 function parseArgumentsIntoUpdate(update) {
+    // stringArgv will remove single apostraphes, replace them for now with a special character.
+    var taskName = update.taskName.replace(/'/g, "\\");
+
     // Convert string into args array.
-    var args = (0, _stringArgv2.default)(update.taskName);
+    var args = (0, _stringArgv2.default)(taskName);
+    console.log("String Args ===");
+    console.log(args);
 
     // Parse arguments.
     var argv = (0, _minimist2.default)(args);
-    console.log("Argv ===");
-    console.log(argv);
 
     var parsedUpdate = _extends({}, update);
 
@@ -799,8 +802,9 @@ function parseArgumentsIntoUpdate(update) {
         parsedUpdate.isHighPriority = true;
     }
 
-    // Use text ignored by parseArgs to rebuild taskName.
-    parsedUpdate.taskName = argv._.join(" ");
+    // Use text ignored by parseArgs to rebuild taskName,
+    // but first put the apostraphes you removed earlier back into the string.
+    parsedUpdate.taskName = argv._.join(" ").replace(/\\/g, "'");
 
     return parsedUpdate;
 }
