@@ -236,34 +236,39 @@ export function appReducer(state, action) {
 // Helper Methods.
 var getProjectSelectorDueDateDisplaysHelper = function(tasks) {
     var returnList = {};
-
+    
     tasks.forEach(item => {
-      if (item.dueDate !== "" && item.isComplete !== true) {
-        if (returnList[item.project] == undefined) {
-          returnList[item.project] = {greens: 0, yellows: 0, yellowReds: 0, reds: 0};
+        if (item.dueDate !== "" && item.isComplete !== true) {
+            // Create an entry in returnList if not already existing.
+            if (returnList[item.project] == undefined) {
+                returnList[item.project] = { greens: 0, yellows: 0, yellowReds: 0, reds: 0 };
+            }
+
+            var { className } = ParseDueDate(item.isComplete, item.dueDate);
+            switch (className) {
+                case "DueDate Later":
+                    returnList[item.project].greens += 1;
+                    break;
+
+                case "DueDate Soon":
+                    returnList[item.project].yellows += 1;
+                    break;
+
+                case "DueDate Today":
+                    returnList[item.project].yellowReds += 1;
+                    break;
+
+                case "DueDate Overdue":
+                    returnList[item.project].reds += 1;
+                    break;
+
+                default:
+                    break;
+            }
         }
-
-        var {className} = ParseDueDate(item.isComplete, item.dueDate);
-        switch (className) {
-          case "DueDate Later":
-            returnList[item.project].greens += 1;
-            break;
-          
-          case "DueDate Soon":
-            returnList[item.project].yellows += 1;
-            break;
-
-          case "DueDate Today":
-            returnList[item.project].yellowReds += 1;
-
-          case "DueDate Overdue":
-            returnList[item.project].reds += 1;
-
-          default:
-            break;
-        }
-      }
     })
+
+    console.log(returnList);
 
     return returnList;
   }

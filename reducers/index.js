@@ -223,6 +223,7 @@ var getProjectSelectorDueDateDisplaysHelper = function getProjectSelectorDueDate
 
     tasks.forEach(function (item) {
         if (item.dueDate !== "" && item.isComplete !== true) {
+            // Create an entry in returnList if not already existing.
             if (returnList[item.project] == undefined) {
                 returnList[item.project] = { greens: 0, yellows: 0, yellowReds: 0, reds: 0 };
             }
@@ -241,15 +242,19 @@ var getProjectSelectorDueDateDisplaysHelper = function getProjectSelectorDueDate
 
                 case "DueDate Today":
                     returnList[item.project].yellowReds += 1;
+                    break;
 
                 case "DueDate Overdue":
                     returnList[item.project].reds += 1;
+                    break;
 
                 default:
                     break;
             }
         }
     });
+
+    console.log(returnList);
 
     return returnList;
 };
