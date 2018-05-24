@@ -236,7 +236,7 @@ export function appReducer(state, action) {
 // Helper Methods.
 var getProjectSelectorDueDateDisplaysHelper = function(tasks) {
     var returnList = {};
-    
+
     tasks.forEach(item => {
         if (item.dueDate !== "" && item.isComplete !== true) {
             // Create an entry in returnList if not already existing.
@@ -267,8 +267,6 @@ var getProjectSelectorDueDateDisplaysHelper = function(tasks) {
             }
         }
     })
-
-    console.log(returnList);
 
     return returnList;
   }
