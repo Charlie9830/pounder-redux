@@ -254,7 +254,5 @@ var getProjectSelectorDueDateDisplaysHelper = function getProjectSelectorDueDate
         }
     });
 
-    console.log(returnList);
-
     return returnList;
 };
