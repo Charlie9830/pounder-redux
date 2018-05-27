@@ -43,6 +43,7 @@ var initialState = {
     taskListsHavePendingWrites: false,
     tasksHavePendingWrites: false,
     isTaskListJumpMenuOpen: false,
+    isShuttingDown: false,
 }
 
 export var appStore = createStore(

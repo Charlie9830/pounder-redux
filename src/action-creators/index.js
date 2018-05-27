@@ -11,6 +11,13 @@ const legalArgsRegEx = / -dd | -hp /i;
 const dateFormat = "DD-MM-YYYY";
 
 // Standard Action Creators.
+export function setIsShuttingDownFlag(isShuttingDown) {
+    return {
+        type: ActionTypes.SET_IS_SHUTTING_DOWN_FLAG,
+        value: isShuttingDown
+    }
+}
+
 export function changeFocusedTaskList(id) {
     return {
         type: ActionTypes.CHANGE_FOCUSED_TASKLIST,

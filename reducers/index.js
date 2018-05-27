@@ -211,6 +211,11 @@ function appReducer(state, action) {
                 isTaskListJumpMenuOpen: false
             });
 
+        case ActionTypes.SET_IS_SHUTTING_DOWN_FLAG:
+            return _extends({}, state, {
+                isShuttingDown: action.value
+            });
+
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);
             return state;

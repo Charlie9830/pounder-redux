@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", {
 
 var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
 
+exports.setIsShuttingDownFlag = setIsShuttingDownFlag;
 exports.changeFocusedTaskList = changeFocusedTaskList;
 exports.selectTask = selectTask;
 exports.openTask = openTask;
@@ -91,6 +92,13 @@ var legalArgsRegEx = / -dd | -hp /i;
 var dateFormat = "DD-MM-YYYY";
 
 // Standard Action Creators.
+function setIsShuttingDownFlag(isShuttingDown) {
+    return {
+        type: ActionTypes.SET_IS_SHUTTING_DOWN_FLAG,
+        value: isShuttingDown
+    };
+}
+
 function changeFocusedTaskList(id) {
     return {
         type: ActionTypes.CHANGE_FOCUSED_TASKLIST,
