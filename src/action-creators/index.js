@@ -11,6 +11,13 @@ const legalArgsRegEx = / -dd | -hp /i;
 const dateFormat = "DD-MM-YYYY";
 
 // Standard Action Creators.
+export function setAppSettingsMenuPage(pageName) {
+    return {
+        type: ActionTypes.SET_APP_SETTINGS_MENU_PAGE,
+        value: pageName
+    }
+}
+
 export function setIsShuttingDownFlag(isShuttingDown) {
     return {
         type: ActionTypes.SET_IS_SHUTTING_DOWN_FLAG,

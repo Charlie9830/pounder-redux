@@ -232,6 +232,12 @@ export function appReducer(state, action) {
                 ...state,
                 isShuttingDown: action.value,
             }
+        
+        case ActionTypes.SET_APP_SETTINGS_MENU_PAGE:
+            return {
+                ...state,
+                appSettingsMenuPage: action.value,
+            }
 
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);

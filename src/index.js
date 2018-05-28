@@ -44,6 +44,7 @@ var initialState = {
     tasksHavePendingWrites: false,
     isTaskListJumpMenuOpen: false,
     isShuttingDown: false,
+    appSettingsMenuPage: "general",
 }
 
 export var appStore = createStore(
