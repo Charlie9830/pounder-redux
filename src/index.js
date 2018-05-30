@@ -45,6 +45,11 @@ var initialState = {
     isTaskListJumpMenuOpen: false,
     isShuttingDown: false,
     appSettingsMenuPage: "general",
+    databaseInfo: "",
+    isDatabasePurging: false,
+    restoreDatabaseStatusMessage: "",
+    isDatabaseRestoring: false,
+    isRestoreDatabaseCompleteDialogOpen: false,
 }
 
 export var appStore = createStore(

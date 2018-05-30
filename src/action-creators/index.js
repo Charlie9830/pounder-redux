@@ -11,6 +11,41 @@ const legalArgsRegEx = / -dd | -hp /i;
 const dateFormat = "DD-MM-YYYY";
 
 // Standard Action Creators.
+export function setIsRestoreDatabaseCompleteDialogOpen(isOpen) {
+    return {
+        type: ActionTypes.SET_IS_RESTORE_DATBASE_COMPLETE_DIALOG_OPEN,
+        value: isOpen,
+    }
+}
+
+export function setIsDatabaseRestoringFlag(isRestoring) {
+    return {
+        type: ActionTypes.SET_IS_DATABASE_RESTORING_FLAG,
+        value: isRestoring
+    }
+}
+
+export function setRestoreDatabaseStatusMessage(message) {
+    return {
+        type: ActionTypes.SET_RESTORE_DATABASE_STATUS_MESSAGE,
+        value: message
+    }
+}
+
+export function setDatabasePurgingFlag(isPurging) {
+    return {
+        type: ActionTypes.SET_DATABASE_PURGING_FLAG,
+        value: isPurging
+    }
+}
+
+export function setDatabaseInfo(info) {
+    return {
+        type: ActionTypes.SET_DATABASE_INFO,
+        value: info,
+    }
+}
+
 export function setAppSettingsMenuPage(pageName) {
     return {
         type: ActionTypes.SET_APP_SETTINGS_MENU_PAGE,
@@ -235,6 +270,90 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
+export function purgeCompleteTasksAsync() {
+    return (dispatch, getState, {getFirestore, getAuth}) => {
+        dispatch(setDatabasePurgingFlag(true));
+
+        getFirestore().collection(TASKS).get().then(snapshot => {
+            // Collect Id's of completed Tasks.
+            var completedTaskIds = [];
+            snapshot.forEach(doc => {
+                if (doc.data().isComplete) {
+                    completedTaskIds.push(doc.id);
+                }
+            })
+
+            // Delete those Tasks.
+            // Build Batch.
+            var batch = getFirestore().batch();
+            completedTaskIds.forEach(taskId => {
+                batch.delete(getFirestore().collection(TASKS).doc(taskId));
+            })
+
+            // Execute Batch.
+            batch.commit().then(() => {
+                dispatch(setDatabasePurgingFlag(false));
+            })
+        })
+    }
+}
+
+
+export function getDatabaseInfoAsync() {
+    return (dispatch, getState, {getFirestore, getAuth }) => {
+        dispatch(setDatabaseInfo("...Collecting Info"));
+
+        var projectCount = getState().projects.length;
+        var taskListCount = getState().taskLists.length;
+        var tasksCount = getState().tasks.length;
+        var completedTasksCount = getState().tasks.filter(item => {
+            return item.isComplete === true;
+        }).length;
+
+        // Collect Precursor data for calculating Orphans.
+        var projectIds = getState().projects.map(item => {
+            return item.uid;
+        })
+
+        var taskListIds = getState().taskLists.map(item => {
+            return item.uid;
+        })
+
+        // Calculate Orphans
+        // Tasks Orphaned from Project.
+        var taskOrphansCount = getState().tasks.filter(item => {
+            return !projectIds.includes(item.project);
+        }).length;
+
+        // TaskLists Orphaned from Project.
+        var taskListOrphansCount = getState().taskLists.filter(item => {
+            return !projectIds.includes(item.project);
+        })
+
+        // Tasks Orphaned from TaskLists.
+        var taskTaskListOrphansCount = getState().tasks.filter(item => {
+            return !taskListIds.includes(item.taskList);
+        })
+
+        // Build Info String.
+        var infoString = "********** DATABASE INFO **********\n" +
+        "                   ITEM COUNTS\n" +
+        "-> Projects:  " + projectCount + "\n" +
+        "-> Task Lists:    " + taskListCount + "\n" +
+        "-> Tasks (Total):    " + tasksCount + "\n" +
+        "-> Tasks (Completed):    " + completedTasksCount + "\n\n" +
+        "                   ORPHAN ITEM COUNTS\n" +
+        "Orphan Items are created from Database Sync issues, usually from a bad internet connection." + "\n" +
+        "-> Tasks orphaned from Project:   " + taskOrphansCount + "\n" +
+        "-> Tasks orphaned from Task Lists:    " + taskTaskListOrphansCount + "\n" +
+        "-> Task Lists orphaned from Project:  " + taskListOrphansCount + "\n\n" +
+        "\n \n " +
+        "********** END OF INFO **********";
+
+        dispatch(setDatabaseInfo(infoString));
+    }
+}
+
 export function updateTaskPriority(taskId, newValue) {
     return (dispatch, getState, { getFirestore, getAuth } ) => {
         dispatch(closeCalendar());

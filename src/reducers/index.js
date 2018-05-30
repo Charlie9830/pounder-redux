@@ -239,6 +239,36 @@ export function appReducer(state, action) {
                 appSettingsMenuPage: action.value,
             }
 
+        case ActionTypes.SET_DATABASE_INFO:
+            return {
+                ...state,
+                databaseInfo: action.value
+            }
+
+        case ActionTypes.SET_DATABASE_PURGING_FLAG:
+            return {
+                ...state,
+                isDatabasePurging: action.value
+            }
+
+        case ActionTypes.SET_RESTORE_DATABASE_STATUS_MESSAGE:
+            return {
+                ...state,
+                restoreDatabaseStatusMessage: action.value,
+            }
+
+        case ActionTypes.SET_IS_DATABASE_RESTORING_FLAG:
+            return {
+                ...state,
+                isDatabaseRestoring: action.value
+            }
+        
+        case ActionTypes.SET_IS_RESTORE_DATBASE_COMPLETE_DIALOG_OPEN:
+            return {
+                ...state,
+                isRestoreDatabaseCompleteDialogOpen: action.value,
+            }
+
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);
             return state;
