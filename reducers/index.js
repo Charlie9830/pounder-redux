@@ -246,6 +246,35 @@ function appReducer(state, action) {
                 isRestoreDatabaseCompleteDialogOpen: action.value
             });
 
+        case ActionTypes.RECEIVE_GENERAL_CONFIG:
+            {
+                return _extends({}, state, {
+                    generalConfig: action.value,
+                    isDexieConfigLoadComplete: true
+                });
+            }
+
+        case ActionTypes.SET_IS_STARTING_UP_FLAG:
+            {
+                return _extends({}, state, {
+                    isStartingUp: action.value
+                });
+            }
+
+        case ActionTypes.SET_IS_DEXIE_CONFIG_LOAD_COMPLETE_FLAG:
+            {
+                return _extends({}, state, {
+                    isDexieConfigLoadComplete: action.value
+                });
+            }
+
+        case ActionTypes.SET_IS_APP_SETTINGS_OPEN:
+            {
+                return _extends({}, state, {
+                    isAppSettingsOpen: action.value
+                });
+            }
+
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);
             return state;

@@ -25,6 +25,8 @@ var _pounderFirebase = require('pounder-firebase');
 
 var _pounderStores = require('pounder-stores');
 
+var _pounderDexie = require('pounder-dexie');
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
@@ -33,6 +35,7 @@ var IncludeQueryMetadataChanges = exports.IncludeQueryMetadataChanges = { includ
 
     // Make sure you are calling this first before using the Store.
 };function setupBackend(mode, platform) {
+    // Firebase.
     (0, _pounderFirebase.setupFirebase)(mode);
 
     if (platform === "desktop") {
@@ -40,6 +43,9 @@ var IncludeQueryMetadataChanges = exports.IncludeQueryMetadataChanges = { includ
     } else {
         exports.IncludeQueryMetadataChanges = IncludeQueryMetadataChanges = { includeQueryMetadataChanges: false };
     }
+
+    // Dexie.
+    (0, _pounderDexie.initializeDexie)();
 }
 
 var initialState = (_initialState = {
@@ -59,6 +65,6 @@ var initialState = (_initialState = {
     projectSelectorDueDateDisplays: [],
     isLockScreenDisplayed: false,
     lastBackupMessage: ""
-}, _defineProperty(_initialState, 'openTaskListSettingsMenuId', -1), _defineProperty(_initialState, 'projectsHavePendingWrites', false), _defineProperty(_initialState, 'projectLayoutsHavePendingWrites', false), _defineProperty(_initialState, 'taskListsHavePendingWrites', false), _defineProperty(_initialState, 'tasksHavePendingWrites', false), _defineProperty(_initialState, 'isTaskListJumpMenuOpen', false), _defineProperty(_initialState, 'isShuttingDown', false), _defineProperty(_initialState, 'appSettingsMenuPage', "general"), _defineProperty(_initialState, 'databaseInfo', ""), _defineProperty(_initialState, 'isDatabasePurging', false), _defineProperty(_initialState, 'restoreDatabaseStatusMessage', ""), _defineProperty(_initialState, 'isDatabaseRestoring', false), _defineProperty(_initialState, 'isRestoreDatabaseCompleteDialogOpen', false), _initialState);
+}, _defineProperty(_initialState, 'openTaskListSettingsMenuId', -1), _defineProperty(_initialState, 'projectsHavePendingWrites', false), _defineProperty(_initialState, 'projectLayoutsHavePendingWrites', false), _defineProperty(_initialState, 'taskListsHavePendingWrites', false), _defineProperty(_initialState, 'tasksHavePendingWrites', false), _defineProperty(_initialState, 'isTaskListJumpMenuOpen', false), _defineProperty(_initialState, 'isShuttingDown', false), _defineProperty(_initialState, 'isStartingUp', true), _defineProperty(_initialState, 'appSettingsMenuPage', "general"), _defineProperty(_initialState, 'databaseInfo', ""), _defineProperty(_initialState, 'isDatabasePurging', false), _defineProperty(_initialState, 'restoreDatabaseStatusMessage', ""), _defineProperty(_initialState, 'isDatabaseRestoring', false), _defineProperty(_initialState, 'isRestoreDatabaseCompleteDialogOpen', false), _defineProperty(_initialState, 'generalConfig', _pounderDexie.generalConfigFallback), _defineProperty(_initialState, 'isDexieConfigLoadComplete', false), _defineProperty(_initialState, 'isAppSettingsOpen', false), _initialState);
 
-var appStore = exports.appStore = (0, _redux.createStore)(_index.appReducer, initialState, (0, _redux.applyMiddleware)(_reduxThunk2.default.withExtraArgument({ getFirestore: _pounderFirebase.getFirestore, getAuth: _pounderFirebase.getAuth }) /* Logger */));
+var appStore = exports.appStore = (0, _redux.createStore)(_index.appReducer, initialState, (0, _redux.applyMiddleware)(_reduxThunk2.default.withExtraArgument({ getFirestore: _pounderFirebase.getFirestore, getAuth: _pounderFirebase.getAuth, getDexie: _pounderDexie.getDexie }) /* Logger */));

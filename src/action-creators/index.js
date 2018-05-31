@@ -1,6 +1,6 @@
 import * as ActionTypes from '../action-types/index';
-import { PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS } from 'pounder-firebase';
-import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore } from 'pounder-stores';
+import { PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS, ACCOUNT } from 'pounder-firebase';
+import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore, AccountStore } from 'pounder-stores';
 import Moment from 'moment';
 import { IncludeQueryMetadataChanges } from '../index';
 import parseArgs from 'minimist';
@@ -11,6 +11,27 @@ const legalArgsRegEx = / -dd | -hp /i;
 const dateFormat = "DD-MM-YYYY";
 
 // Standard Action Creators.
+export function setIsAppSettingsOpen(isOpen) {
+    return {
+        type: ActionTypes.SET_IS_APP_SETTINGS_OPEN,
+        value: isOpen,
+    }
+}
+
+export function setIsDexieConfigLoadComplete(isComplete) {
+    return {
+        type: ActionTypes.SET_IS_DEXIE_CONFIG_LOAD_COMPLETE_FLAG,
+        value: isComplete
+    }
+}
+
+export function setIsStartingUpFlag(isStartingUp) {
+    return {
+        type: ActionTypes.SET_IS_STARTING_UP_FLAG,
+        value: isStartingUp
+    }
+}
+
 export function setIsRestoreDatabaseCompleteDialogOpen(isOpen) {
     return {
         type: ActionTypes.SET_IS_RESTORE_DATBASE_COMPLETE_DIALOG_OPEN,
@@ -256,6 +277,12 @@ export function closeTaskListJumpMenu() {
     }
 }
 
+export function receiveGeneralConfig(config) {
+    return {
+        type: ActionTypes.RECEIVE_GENERAL_CONFIG,
+        value: config
+    }
+}
 
 
 // Private Actions.
@@ -270,8 +297,44 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
+export function setFavourteProjectId(projectId) {
+    return (dispatch, getState, {getFirestore, getAuth, getDexie }) => {
+
+    }
+}
+
+
+export function getGeneralConfigAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        getDexie().generalConfig.where('id').equals(0).first().then(data => {
+            if (data !== undefined) {
+                var config = data.value;
+                dispatch(receiveGeneralConfig(config));
+
+                if (getState().isStartingUp) {
+                    // Application is Starting up. Dispatch Actions to Sync appliction to Config State.
+                    syncAppToConfig(config, dispatch);
+                }
+            }
+            // If data doesn't exist in Dexie we can safely that the Fallback values given to the initial state
+            // are still correct.
+            if (getState().isStartingUp) {
+                syncAppToConfig(getState().generalConfig, dispatch);
+            }
+        })
+    }
+}
+
+export function setGeneralConfigAsync(newConfig) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        getDexie().generalConfig.put({ id: 0, value: newConfig }).then(() => {
+            dispatch(receiveGeneralConfig(newConfig));
+        })
+    }
+}
+
 export function purgeCompleteTasksAsync() {
-    return (dispatch, getState, {getFirestore, getAuth}) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(setDatabasePurgingFlag(true));
 
         getFirestore().collection(TASKS).get().then(snapshot => {
@@ -300,7 +363,7 @@ export function purgeCompleteTasksAsync() {
 
 
 export function getDatabaseInfoAsync() {
-    return (dispatch, getState, {getFirestore, getAuth }) => {
+    return (dispatch, getState, { getFirestore, getAuth }) => {
         dispatch(setDatabaseInfo("...Collecting Info"));
 
         var projectCount = getState().projects.length;
@@ -337,25 +400,25 @@ export function getDatabaseInfoAsync() {
 
         // Build Info String.
         var infoString = "********** DATABASE INFO **********\n" +
-        "                   ITEM COUNTS\n" +
-        "-> Projects:  " + projectCount + "\n" +
-        "-> Task Lists:    " + taskListCount + "\n" +
-        "-> Tasks (Total):    " + tasksCount + "\n" +
-        "-> Tasks (Completed):    " + completedTasksCount + "\n\n" +
-        "                   ORPHAN ITEM COUNTS\n" +
-        "Orphan Items are created from Database Sync issues, usually from a bad internet connection." + "\n" +
-        "-> Tasks orphaned from Project:   " + taskOrphansCount + "\n" +
-        "-> Tasks orphaned from Task Lists:    " + taskTaskListOrphansCount + "\n" +
-        "-> Task Lists orphaned from Project:  " + taskListOrphansCount + "\n\n" +
-        "\n \n " +
-        "********** END OF INFO **********";
+            "                   ITEM COUNTS\n" +
+            "-> Projects:  " + projectCount + "\n" +
+            "-> Task Lists:    " + taskListCount + "\n" +
+            "-> Tasks (Total):    " + tasksCount + "\n" +
+            "-> Tasks (Completed):    " + completedTasksCount + "\n\n" +
+            "                   ORPHAN ITEM COUNTS\n" +
+            "Orphan Items are created from Database Sync issues, usually from a bad internet connection." + "\n" +
+            "-> Tasks orphaned from Project:   " + taskOrphansCount + "\n" +
+            "-> Tasks orphaned from Task Lists:    " + taskTaskListOrphansCount + "\n" +
+            "-> Task Lists orphaned from Project:  " + taskListOrphansCount + "\n\n" +
+            "\n \n " +
+            "********** END OF INFO **********";
 
         dispatch(setDatabaseInfo(infoString));
     }
 }
 
 export function updateTaskPriority(taskId, newValue) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(closeCalendar());
 
         // Update Firestore.
@@ -370,7 +433,7 @@ export function updateTaskPriority(taskId, newValue) {
 
 
 export function updateTaskDueDateAsync(taskId, newDate) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(closeCalendar());
 
         // Update Firestore.
@@ -385,7 +448,7 @@ export function updateTaskDueDateAsync(taskId, newDate) {
 }
 
 export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(setOpenTaskListSettingsMenuId(-1));
 
         // Update Firestore.
@@ -400,7 +463,7 @@ export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
 }
 
 export function removeTaskListAsync(taskListWidgetId) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         if (taskListWidgetId !== -1) {
             // Update Firestore.
             // Collect related TaskIds.
@@ -423,13 +486,13 @@ export function removeTaskListAsync(taskListWidgetId) {
 
             dispatch(changeFocusedTaskList(-1));
         }
-        
+
     }
 }
 
 
 export function updateProjectNameAsync(projectId, newValue) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         // Update Firestore.
         var projectRef = getFirestore().collection(PROJECTS).doc(projectId);
         projectRef.update({ projectName: newValue }).then(() => {
@@ -439,7 +502,7 @@ export function updateProjectNameAsync(projectId, newValue) {
 }
 
 export function removeProjectAsync(projectId) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
 
         if (getState.selectedProjectId !== -1) {
             // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
@@ -482,7 +545,7 @@ export function removeProjectAsync(projectId) {
 
 
 export function addNewProjectAsync() {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         // Update Firestore.    
         var newProjectName = "New Project";
         var batch = getFirestore().batch();
@@ -511,7 +574,7 @@ export function addNewProjectAsync() {
 
 
 export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         if (getState().selectedTask.taskListWidgetId !== taskListWidgetId &&
             getState().selectedTask.taskId !== taskId) {
             dispatch(selectTask(taskListWidgetId, taskId));
@@ -530,9 +593,9 @@ export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
 }
 
 export function updateProjectLayoutAsync(layouts, projectId) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         var newTrimmedLayouts = trimLayoutsHelper(layouts);
-        
+
         // Update Firestore.
         var projectLayoutsRef = getFirestore().collection(PROJECTLAYOUTS).doc(projectId);
         projectLayoutsRef.update({ layouts: newTrimmedLayouts }).then(() => {
@@ -543,7 +606,7 @@ export function updateProjectLayoutAsync(layouts, projectId) {
 
 
 export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(closeTask(taskListWidgetId, taskId));
 
         // TODO: Notify of Firebase Request.
@@ -552,7 +615,7 @@ export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
             taskName: newData,
             isNewTask: false // Reset new Task Property.
         }
-        
+
         // Returns a new Update Object with arguments parsed in (if any);
         var newUpdate = parseArgumentsIntoUpdate(update);
 
@@ -560,14 +623,14 @@ export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
         // Update Firestore.
         var taskRef = getFirestore().collection(TASKS).doc(taskId);
         taskRef.update(newUpdate).then(() => {
-          // Carefull what you do here, promises don't resolve if you are offline.
+            // Carefull what you do here, promises don't resolve if you are offline.
         })
     }
 }
 
 export function removeSelectedTaskAsync() {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
-        
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+
         var taskId = getState().selectedTask.taskId;
         if (taskId !== -1) {
             // Update Firestore.    
@@ -587,7 +650,7 @@ export function removeSelectedTaskAsync() {
 
 
 export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         var taskListRef = getFirestore().collection(TASKLISTS).doc(taskListWidgetId);
         taskListRef.update({ taskListName: newName }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
@@ -597,15 +660,15 @@ export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
 
 
 export function moveTaskAsync(destinationTaskListId) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(startTaskMoveInDatabase());
 
         var movingTaskId = getState().movingTaskId;
         var taskRef = getFirestore().collection(TASKS).doc(movingTaskId);
         taskRef.update({
-          taskList: destinationTaskListId
+            taskList: destinationTaskListId
         }).then(() => {
-          /// Carefull what you do here, promises don't resolve if you are offline.
+            /// Carefull what you do here, promises don't resolve if you are offline.
         })
 
         dispatch(endTaskMove(movingTaskId, destinationTaskListId));
@@ -614,42 +677,42 @@ export function moveTaskAsync(destinationTaskListId) {
 
 
 export function addNewTaskAsync() {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         if (getState().focusedTaskListId !== -1) {
 
             const { selectedProjectId, focusedTaskListId } = getState();
 
             if (selectedProjectId !== -1 && focusedTaskListId !== -1) {
                 // Add a new Task.
-            dispatch(startTaskAdd());
+                dispatch(startTaskAdd());
 
-            var newTaskRef = getFirestore().collection(TASKS).doc();
-            var newTaskKey = newTaskRef.id;
-      
-            var newTask = new TaskStore(
-              "",
-              "",
-              false,
-              selectedProjectId,
-              focusedTaskListId,
-              newTaskKey,
-              new Moment().toISOString(),
-              true,
-              false
-            )
-      
-            newTaskRef.set(Object.assign({}, newTask)).then(() => {
-            })
+                var newTaskRef = getFirestore().collection(TASKS).doc();
+                var newTaskKey = newTaskRef.id;
 
-            dispatch(openTask(newTask.taskList, newTask.uid)); // Opening a Task by convention Selects it.
+                var newTask = new TaskStore(
+                    "",
+                    "",
+                    false,
+                    selectedProjectId,
+                    focusedTaskListId,
+                    newTaskKey,
+                    new Moment().toISOString(),
+                    true,
+                    false
+                )
+
+                newTaskRef.set(Object.assign({}, newTask)).then(() => {
+                })
+
+                dispatch(openTask(newTask.taskList, newTask.uid)); // Opening a Task by convention Selects it.
 
             }
-        }    
+        }
     }
 }
 
 export function addNewTaskListAsync() {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(startTasklistAdd());
 
         var selectedProjectId = getState().selectedProjectId;
@@ -669,12 +732,12 @@ export function addNewTaskListAsync() {
             newTaskListRef.set(Object.assign({}, newTaskList)).then(() => {
                 // Carefull what you do here, promises don't resolve if you are offline.
             })
-        } 
+        }
     }
 }
 
 export function getProjectsAsync() {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(startProjectsFetch());
 
         // Get Projects from Firestore.
@@ -684,7 +747,7 @@ export function getProjectsAsync() {
 
             if (snapshot.docChanges.length > 0) {
                 var projects = [];
-                snapshot.forEach( doc => {
+                snapshot.forEach(doc => {
                     projects.push(doc.data());
                 })
 
@@ -695,11 +758,11 @@ export function getProjectsAsync() {
 }
 
 export function getTasksAsync() {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(startTasksFetch());
 
         // Get Tasks from Firestore.
-        getFirestore().collection(TASKS).orderBy("project").onSnapshot( IncludeQueryMetadataChanges, snapshot => {
+        getFirestore().collection(TASKS).orderBy("project").onSnapshot(IncludeQueryMetadataChanges, snapshot => {
             // Handle Metadata.
             dispatch(setTasksHavePendingWrites(snapshot.metadata.hasPendingWrites))
 
@@ -717,7 +780,7 @@ export function getTasksAsync() {
 }
 
 export function getTaskListsAsync(projectId) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(startTaskListsFetch());
 
         // Get Tasklists from Firestore.
@@ -728,7 +791,7 @@ export function getTaskListsAsync(projectId) {
             if (snapshot.docChanges.length > 0) {
                 var taskLists = [];
                 snapshot.forEach(doc => {
-                  taskLists.push(doc.data());
+                    taskLists.push(doc.data());
                 })
 
                 dispatch(receiveTaskLists(taskLists));
@@ -738,10 +801,10 @@ export function getTaskListsAsync(projectId) {
 }
 
 export function getProjectLayoutsAsync(projectId) {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(startProjectLayoutsFetch());
 
-        getFirestore().collection(PROJECTLAYOUTS).where("project", "==", projectId).onSnapshot( IncludeQueryMetadataChanges, snapshot => {
+        getFirestore().collection(PROJECTLAYOUTS).where("project", "==", projectId).onSnapshot(IncludeQueryMetadataChanges, snapshot => {
             // Handle Metadata.
             dispatch(setProjectLayoutsHavePendingWrites(snapshot.metadata.hasPendingWrites));
 
@@ -764,32 +827,32 @@ export function getProjectLayoutsAsync(projectId) {
 }
 
 export function unsubscribeProjectsAsync() {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
-        var projectUnsubscribe = getFirestore().collection(PROJECTS).onSnapshot( () => {});
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        var projectUnsubscribe = getFirestore().collection(PROJECTS).onSnapshot(() => { });
         projectUnsubscribe();
     }
 }
 
 export function unsubscribeTaskListsAsync() {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
-        var taskListsUnsubscribe = getFirestore().collection(TASKLISTS).onSnapshot( () => {});
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        var taskListsUnsubscribe = getFirestore().collection(TASKLISTS).onSnapshot(() => { });
         taskListsUnsubscribe();
     }
 }
 
 export function unsubscribeTasksAsync() {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
-        var tasksUnsubscribe = getFirestore().collection(TASKS).onSnapshot( () => {});
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        var tasksUnsubscribe = getFirestore().collection(TASKS).onSnapshot(() => { });
         tasksUnsubscribe();
     }
 }
 
 export function unsubscribeProjectLayoutsAsync() {
-    return (dispatch, getState, { getFirestore, getAuth } ) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         if (getState().selectedProjectId !== -1) {
-            var projectLayoutsUnsubscribe = getFirestore().collection(PROJECTLAYOUTS).doc(getState().selectedProjectId).onSnapshot( () => {});
+            var projectLayoutsUnsubscribe = getFirestore().collection(PROJECTLAYOUTS).doc(getState().selectedProjectId).onSnapshot(() => { });
             projectLayoutsUnsubscribe();
-          }
+        }
     }
 }
 
@@ -797,14 +860,14 @@ export function unsubscribeProjectLayoutsAsync() {
 function parseArgumentsIntoUpdate(update) {
     // stringArgv() will remove single apostraphes, replace them with a \ for now, we will put the apostraphes back in later.
     var taskName = update.taskName.replace(/'/g, "\\");
-    
+
     // Convert string into args array.
     var args = stringArgv(taskName);
 
     // Parse arguments.
     var argv = parseArgs(args);
 
-    var parsedUpdate = {...update };
+    var parsedUpdate = { ...update };
 
     // dueDate.
     if (argv.d !== undefined) {
@@ -853,12 +916,12 @@ function parseDateArgument(d) {
 
     // Days Forward.
     else if (d.includes('d')) {
-        return getDaysForwardDate(d.slice(0,d.length - 1));
+        return getDaysForwardDate(d.slice(0, d.length - 1));
     }
 
     // Weeks Forward.
     else if (d.includes('w')) {
-        return getWeeksForwardDate((d.slice(0,d.length -1)));
+        return getWeeksForwardDate((d.slice(0, d.length - 1)));
     }
 
     return "";
@@ -867,7 +930,7 @@ function parseDateArgument(d) {
 function collectProjectRelatedTaskIds(tasks, projectId) {
     return tasks.filter(task => {
         return task.project === projectId
-    }).map(task => { return task.uid});
+    }).map(task => { return task.uid });
 }
 
 function collectTaskListRelatedTaskIds(tasks, taskListWidgetId) {
@@ -882,15 +945,23 @@ function collectTaskListRelatedTaskIds(tasks, taskListWidgetId) {
 
 function trimLayoutsHelper(layouts) {
     var trimmedLayouts = layouts.map(item => {
-      return {
-        i: item.i,
-        x: item.x,
-        y: item.y,
-        w: item.w,
-        h: item.h,
-      }
+        return {
+            i: item.i,
+            x: item.x,
+            y: item.y,
+            w: item.w,
+            h: item.h,
+        }
     })
 
     return trimmedLayouts
-  }
+}
 
+
+function syncAppToConfig(generalConfig, dispatch) {
+    if (generalConfig.startLocked) {
+        dispatch(lockApp());
+    }
+
+    dispatch(setIsStartingUpFlag(false));
+}

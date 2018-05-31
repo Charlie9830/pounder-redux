@@ -4,11 +4,13 @@ import Logger from 'redux-logger';
 import ReduxThunk from 'redux-thunk';
 import { setupFirebase, getFirestore, getAuth } from 'pounder-firebase';
 import { ProjectLayoutStore } from 'pounder-stores';
+import { initializeDexie, getDexie, generalConfigFallback } from 'pounder-dexie';
 
 export var IncludeQueryMetadataChanges = { includeQueryMetadataChanges: false }
 
 // Make sure you are calling this first before using the Store.
 export function setupBackend(mode, platform) {
+    // Firebase.
     setupFirebase(mode);
     
     if (platform === "desktop") {
@@ -18,6 +20,9 @@ export function setupBackend(mode, platform) {
     else {
         IncludeQueryMetadataChanges = { includeQueryMetadataChanges: false }
     }
+
+    // Dexie.
+    initializeDexie();
 }
 
 var initialState = {
@@ -44,16 +49,20 @@ var initialState = {
     tasksHavePendingWrites: false,
     isTaskListJumpMenuOpen: false,
     isShuttingDown: false,
+    isStartingUp: true,
     appSettingsMenuPage: "general",
     databaseInfo: "",
     isDatabasePurging: false,
     restoreDatabaseStatusMessage: "",
     isDatabaseRestoring: false,
     isRestoreDatabaseCompleteDialogOpen: false,
+    generalConfig: generalConfigFallback,
+    isDexieConfigLoadComplete: false,
+    isAppSettingsOpen: false,
 }
 
 export var appStore = createStore(
     appReducer,
     initialState,
-    applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth} ), /* Logger */)
+    applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth, getDexie } ), /* Logger */)
 );

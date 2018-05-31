@@ -268,6 +268,35 @@ export function appReducer(state, action) {
                 ...state,
                 isRestoreDatabaseCompleteDialogOpen: action.value,
             }
+        
+        case ActionTypes.RECEIVE_GENERAL_CONFIG: {
+            return {
+                ...state,
+                generalConfig: action.value,
+                isDexieConfigLoadComplete: true,
+            }
+        }
+
+        case ActionTypes.SET_IS_STARTING_UP_FLAG: {
+            return {
+                ...state,
+                isStartingUp: action.value
+            }
+        }
+
+        case ActionTypes.SET_IS_DEXIE_CONFIG_LOAD_COMPLETE_FLAG: {
+            return {
+                ...state,
+                isDexieConfigLoadComplete: action.value
+            }
+        }
+
+        case ActionTypes.SET_IS_APP_SETTINGS_OPEN: {
+            return {
+                ...state,
+                isAppSettingsOpen: action.value,
+            }
+        }
 
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);
