@@ -2,8 +2,8 @@ import { createStore, applyMiddleware } from 'redux';
 import { appReducer } from './reducers/index';
 import Logger from 'redux-logger';
 import ReduxThunk from 'redux-thunk';
-import { setupFirebase, getFirestore, getAuth } from 'pounder-firebase';
-import { ProjectLayoutStore } from 'pounder-stores';
+import { setupFirebase, getFirestore, getAuth, AccountConfigFallback } from 'pounder-firebase';
+import { ProjectLayoutStore, CssConfigStore } from 'pounder-stores';
 import { initializeDexie, getDexie, generalConfigFallback } from 'pounder-dexie';
 
 export var IncludeQueryMetadataChanges = { includeQueryMetadataChanges: false }
@@ -53,12 +53,14 @@ var initialState = {
     appSettingsMenuPage: "general",
     databaseInfo: "",
     isDatabasePurging: false,
-    restoreDatabaseStatusMessage: "",
     isDatabaseRestoring: false,
-    isRestoreDatabaseCompleteDialogOpen: false,
     generalConfig: generalConfigFallback,
     isDexieConfigLoadComplete: false,
     isAppSettingsOpen: false,
+    accountConfig: AccountConfigFallback,
+    ignoreFullscreenTrigger: false,
+    cssConfig: CssConfigStore, // Fallback values for CSS Config already exist within the CSS bundle.
+    messageBox: {},
 }
 
 export var appStore = createStore(
@@ -66,3 +68,9 @@ export var appStore = createStore(
     initialState,
     applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth, getDexie } ), /* Logger */)
 );
+
+// Types.
+export const MessageBoxTypes = {
+    STANDARD: "STANDARD",
+    OK_ONLY: "OK_ONLY",
+}

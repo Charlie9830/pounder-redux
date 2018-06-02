@@ -231,19 +231,9 @@ function appReducer(state, action) {
                 isDatabasePurging: action.value
             });
 
-        case ActionTypes.SET_RESTORE_DATABASE_STATUS_MESSAGE:
-            return _extends({}, state, {
-                restoreDatabaseStatusMessage: action.value
-            });
-
         case ActionTypes.SET_IS_DATABASE_RESTORING_FLAG:
             return _extends({}, state, {
                 isDatabaseRestoring: action.value
-            });
-
-        case ActionTypes.SET_IS_RESTORE_DATBASE_COMPLETE_DIALOG_OPEN:
-            return _extends({}, state, {
-                isRestoreDatabaseCompleteDialogOpen: action.value
             });
 
         case ActionTypes.RECEIVE_GENERAL_CONFIG:
@@ -271,7 +261,36 @@ function appReducer(state, action) {
         case ActionTypes.SET_IS_APP_SETTINGS_OPEN:
             {
                 return _extends({}, state, {
-                    isAppSettingsOpen: action.value
+                    isAppSettingsOpen: action.value,
+                    ignoreFullscreenTrigger: true // Stops the App toggling to Fullscreen imediately as the User selects the option.
+                });
+            }
+
+        case ActionTypes.RECEIVE_ACCOUNT_CONFIG:
+            {
+                return _extends({}, state, {
+                    accountConfig: action.value
+                });
+            }
+
+        case ActionTypes.SET_IGNORE_FULLSCREEN_TRIGGER_FLAG:
+            {
+                return _extends({}, state, {
+                    ignoreFullscreenTrigger: action.value
+                });
+            }
+
+        case ActionTypes.RECEIVE_CSS_CONFIG:
+            {
+                return _extends({}, state, {
+                    cssConfig: action.value
+                });
+            }
+
+        case ActionTypes.SET_MESSAGE_BOX:
+            {
+                return _extends({}, state, {
+                    messageBox: action.value
                 });
             }
 

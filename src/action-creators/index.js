@@ -1,5 +1,5 @@
 import * as ActionTypes from '../action-types/index';
-import { PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS, ACCOUNT } from 'pounder-firebase';
+import { PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS, ACCOUNT, ACCOUNT_DOC_ID } from 'pounder-firebase';
 import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore, AccountStore } from 'pounder-stores';
 import Moment from 'moment';
 import { IncludeQueryMetadataChanges } from '../index';
@@ -11,6 +11,38 @@ const legalArgsRegEx = / -dd | -hp /i;
 const dateFormat = "DD-MM-YYYY";
 
 // Standard Action Creators.
+export function setMessageBox(isOpen, message, type, dataStore, closeCallback) {
+    return {
+        type: ActionTypes.SET_MESSAGE_BOX,
+        value: {
+            isOpen: isOpen,
+            message: message,
+            type: type,
+            closeCallback: closeCallback,
+        }
+    }
+}
+
+export function receiveCSSConfig(config) {
+    return {
+        type: ActionTypes.RECEIVE_CSS_CONFIG,
+        value: config,
+    }
+}
+export function setIgnoreFullscreenTriggerFlag(value) {
+    return {
+        type: ActionTypes.SET_IGNORE_FULLSCREEN_TRIGGER_FLAG,
+        value: value,
+    }
+}
+
+export function receiveAccountConfig(accountConfig) {
+    return {
+        type: ActionTypes.RECEIVE_ACCOUNT_CONFIG,
+        value: accountConfig,
+    }
+}
+
 export function setIsAppSettingsOpen(isOpen) {
     return {
         type: ActionTypes.SET_IS_APP_SETTINGS_OPEN,
@@ -25,6 +57,13 @@ export function setIsDexieConfigLoadComplete(isComplete) {
     }
 }
 
+export function setIsDatabaseRestoringFlag(isRestoring) {
+    return {
+        type: ActionTypes.SET_IS_DATABASE_RESTORING_FLAG,
+        value: isRestoring,
+    }
+}
+
 export function setIsStartingUpFlag(isStartingUp) {
     return {
         type: ActionTypes.SET_IS_STARTING_UP_FLAG,
@@ -36,20 +75,6 @@ export function setIsRestoreDatabaseCompleteDialogOpen(isOpen) {
     return {
         type: ActionTypes.SET_IS_RESTORE_DATBASE_COMPLETE_DIALOG_OPEN,
         value: isOpen,
-    }
-}
-
-export function setIsDatabaseRestoringFlag(isRestoring) {
-    return {
-        type: ActionTypes.SET_IS_DATABASE_RESTORING_FLAG,
-        value: isRestoring
-    }
-}
-
-export function setRestoreDatabaseStatusMessage(message) {
-    return {
-        type: ActionTypes.SET_RESTORE_DATABASE_STATUS_MESSAGE,
-        value: message
     }
 }
 
@@ -297,9 +322,35 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
-export function setFavourteProjectId(projectId) {
-    return (dispatch, getState, {getFirestore, getAuth, getDexie }) => {
+export function selectProjectAsync(projectId) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        var outgoingProjectId = getState().selectedProjectId;
+        var incomingProjectId = projectId;
 
+        if (outgoingProjectId !== -1) {
+            // Old Listeners.
+            dispatch(unsubscribeProjectLayoutsAsync());
+        }
+
+        if (incomingProjectId !== -1) {
+            dispatch(getProjectLayoutsAsync(projectId));
+        }
+
+        dispatch(selectProject(projectId));
+
+    }
+}
+
+
+export function setFavouriteProjectIdAsync(projectId) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        var ref = getFirestore().collection(ACCOUNT).doc(ACCOUNT_DOC_ID);
+
+        ref.set({
+            favouriteProjectId: projectId
+        }).then( () => {
+            // Carefull what you do here, promises don't resolve if you are offline.
+        })
     }
 }
 
@@ -325,11 +376,37 @@ export function getGeneralConfigAsync() {
     }
 }
 
+export function getCSSConfigAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        getDexie().cssConfig.where('id').equals(0).first().then(data => {
+            if (data !== undefined) {
+                var config = data.value;
+                dispatch(receiveCSSConfig(config));
+            }
+        })
+    }
+}
+
+export function setCSSConfigAsync(newConfig) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+
+        // Update Dexie.
+        getDexie().cssConfig.put({ id: 0, value: newConfig }).then(() => {
+        })
+
+        // Update State.
+        dispatch(receiveCSSConfig(newConfig));
+    }
+}
+
 export function setGeneralConfigAsync(newConfig) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         getDexie().generalConfig.put({ id: 0, value: newConfig }).then(() => {
-            dispatch(receiveGeneralConfig(newConfig));
+            
         })
+
+        // Update State.
+        dispatch(receiveGeneralConfig(newConfig));
     }
 }
 
@@ -736,6 +813,24 @@ export function addNewTaskListAsync() {
     }
 }
 
+export function getAccountConfigAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        getFirestore().collection(ACCOUNT).doc(ACCOUNT_DOC_ID).onSnapshot( doc => {
+            if (doc.exists) {
+                var accountConfig = doc.data();
+                dispatch(receiveAccountConfig(accountConfig));
+
+                // Dexie returns numbers as strings. Convert "-1" to a number if required.
+                var favouriteProjectId = accountConfig.favouriteProjectId === "-1" ?
+                    parseInt(accountConfig.favouriteProjectId) :
+                    accountConfig.favouriteProjectId;
+
+                dispatch(selectProjectAsync(favouriteProjectId));
+            }
+        })
+    }
+}
+
 export function getProjectsAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(startProjectsFetch());
@@ -823,6 +918,13 @@ export function getProjectLayoutsAsync(projectId) {
                 dispatch(receiveProjectLayout(projectLayouts[0]));
             }
         });
+    }
+}
+
+export function unsubscribeAccountConfigAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        var accountConfigUnsubscribe = getFirestore().collection(ACCOUNT).doc(ACCOUNT_DOC_ID).onSnapshot(() => { });
+        accountConfigUnsubscribe();
     }
 }
 

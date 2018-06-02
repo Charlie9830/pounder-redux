@@ -6,12 +6,17 @@ Object.defineProperty(exports, "__esModule", {
 
 var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
 
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+exports.setMessageBox = setMessageBox;
+exports.receiveCSSConfig = receiveCSSConfig;
+exports.setIgnoreFullscreenTriggerFlag = setIgnoreFullscreenTriggerFlag;
+exports.receiveAccountConfig = receiveAccountConfig;
 exports.setIsAppSettingsOpen = setIsAppSettingsOpen;
 exports.setIsDexieConfigLoadComplete = setIsDexieConfigLoadComplete;
+exports.setIsDatabaseRestoringFlag = setIsDatabaseRestoringFlag;
 exports.setIsStartingUpFlag = setIsStartingUpFlag;
 exports.setIsRestoreDatabaseCompleteDialogOpen = setIsRestoreDatabaseCompleteDialogOpen;
-exports.setIsDatabaseRestoringFlag = setIsDatabaseRestoringFlag;
-exports.setRestoreDatabaseStatusMessage = setRestoreDatabaseStatusMessage;
 exports.setDatabasePurgingFlag = setDatabasePurgingFlag;
 exports.setDatabaseInfo = setDatabaseInfo;
 exports.setAppSettingsMenuPage = setAppSettingsMenuPage;
@@ -46,7 +51,11 @@ exports.setTasksHavePendingWrites = setTasksHavePendingWrites;
 exports.openTaskListJumpMenu = openTaskListJumpMenu;
 exports.closeTaskListJumpMenu = closeTaskListJumpMenu;
 exports.receiveGeneralConfig = receiveGeneralConfig;
+exports.selectProjectAsync = selectProjectAsync;
+exports.setFavouriteProjectIdAsync = setFavouriteProjectIdAsync;
 exports.getGeneralConfigAsync = getGeneralConfigAsync;
+exports.getCSSConfigAsync = getCSSConfigAsync;
+exports.setCSSConfigAsync = setCSSConfigAsync;
 exports.setGeneralConfigAsync = setGeneralConfigAsync;
 exports.purgeCompleteTasksAsync = purgeCompleteTasksAsync;
 exports.getDatabaseInfoAsync = getDatabaseInfoAsync;
@@ -65,10 +74,12 @@ exports.updateTaskListWidgetHeaderAsync = updateTaskListWidgetHeaderAsync;
 exports.moveTaskAsync = moveTaskAsync;
 exports.addNewTaskAsync = addNewTaskAsync;
 exports.addNewTaskListAsync = addNewTaskListAsync;
+exports.getAccountConfigAsync = getAccountConfigAsync;
 exports.getProjectsAsync = getProjectsAsync;
 exports.getTasksAsync = getTasksAsync;
 exports.getTaskListsAsync = getTaskListsAsync;
 exports.getProjectLayoutsAsync = getProjectLayoutsAsync;
+exports.unsubscribeAccountConfigAsync = unsubscribeAccountConfigAsync;
 exports.unsubscribeProjectsAsync = unsubscribeProjectsAsync;
 exports.unsubscribeTaskListsAsync = unsubscribeTaskListsAsync;
 exports.unsubscribeTasksAsync = unsubscribeTasksAsync;
@@ -106,6 +117,38 @@ var legalArgsRegEx = / -dd | -hp /i;
 var dateFormat = "DD-MM-YYYY";
 
 // Standard Action Creators.
+function setMessageBox(isOpen, message, type, dataStore, closeCallback) {
+    return {
+        type: ActionTypes.SET_MESSAGE_BOX,
+        value: {
+            isOpen: isOpen,
+            message: message,
+            type: type,
+            closeCallback: closeCallback
+        }
+    };
+}
+
+function receiveCSSConfig(config) {
+    return {
+        type: ActionTypes.RECEIVE_CSS_CONFIG,
+        value: config
+    };
+}
+function setIgnoreFullscreenTriggerFlag(value) {
+    return {
+        type: ActionTypes.SET_IGNORE_FULLSCREEN_TRIGGER_FLAG,
+        value: value
+    };
+}
+
+function receiveAccountConfig(accountConfig) {
+    return {
+        type: ActionTypes.RECEIVE_ACCOUNT_CONFIG,
+        value: accountConfig
+    };
+}
+
 function setIsAppSettingsOpen(isOpen) {
     return {
         type: ActionTypes.SET_IS_APP_SETTINGS_OPEN,
@@ -120,6 +163,13 @@ function setIsDexieConfigLoadComplete(isComplete) {
     };
 }
 
+function setIsDatabaseRestoringFlag(isRestoring) {
+    return {
+        type: ActionTypes.SET_IS_DATABASE_RESTORING_FLAG,
+        value: isRestoring
+    };
+}
+
 function setIsStartingUpFlag(isStartingUp) {
     return {
         type: ActionTypes.SET_IS_STARTING_UP_FLAG,
@@ -131,20 +181,6 @@ function setIsRestoreDatabaseCompleteDialogOpen(isOpen) {
     return {
         type: ActionTypes.SET_IS_RESTORE_DATBASE_COMPLETE_DIALOG_OPEN,
         value: isOpen
-    };
-}
-
-function setIsDatabaseRestoringFlag(isRestoring) {
-    return {
-        type: ActionTypes.SET_IS_DATABASE_RESTORING_FLAG,
-        value: isRestoring
-    };
-}
-
-function setRestoreDatabaseStatusMessage(message) {
-    return {
-        type: ActionTypes.SET_RESTORE_DATABASE_STATUS_MESSAGE,
-        value: message
     };
 }
 
@@ -391,11 +427,49 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
-function getGeneralConfigAsync() {
+function selectProjectAsync(projectId) {
     return function (dispatch, getState, _ref) {
         var getFirestore = _ref.getFirestore,
             getAuth = _ref.getAuth,
             getDexie = _ref.getDexie;
+
+        var outgoingProjectId = getState().selectedProjectId;
+        var incomingProjectId = projectId;
+
+        if (outgoingProjectId !== -1) {
+            // Old Listeners.
+            dispatch(unsubscribeProjectLayoutsAsync());
+        }
+
+        if (incomingProjectId !== -1) {
+            dispatch(getProjectLayoutsAsync(projectId));
+        }
+
+        dispatch(selectProject(projectId));
+    };
+}
+
+function setFavouriteProjectIdAsync(projectId) {
+    return function (dispatch, getState, _ref2) {
+        var getFirestore = _ref2.getFirestore,
+            getAuth = _ref2.getAuth,
+            getDexie = _ref2.getDexie;
+
+        var ref = getFirestore().collection(_pounderFirebase.ACCOUNT).doc(_pounderFirebase.ACCOUNT_DOC_ID);
+
+        ref.set({
+            favouriteProjectId: projectId
+        }).then(function () {
+            // Carefull what you do here, promises don't resolve if you are offline.
+        });
+    };
+}
+
+function getGeneralConfigAsync() {
+    return function (dispatch, getState, _ref3) {
+        var getFirestore = _ref3.getFirestore,
+            getAuth = _ref3.getAuth,
+            getDexie = _ref3.getDexie;
 
         getDexie().generalConfig.where('id').equals(0).first().then(function (data) {
             if (data !== undefined) {
@@ -416,23 +490,54 @@ function getGeneralConfigAsync() {
     };
 }
 
-function setGeneralConfigAsync(newConfig) {
-    return function (dispatch, getState, _ref2) {
-        var getFirestore = _ref2.getFirestore,
-            getAuth = _ref2.getAuth,
-            getDexie = _ref2.getDexie;
+function getCSSConfigAsync() {
+    return function (dispatch, getState, _ref4) {
+        var getFirestore = _ref4.getFirestore,
+            getAuth = _ref4.getAuth,
+            getDexie = _ref4.getDexie;
 
-        getDexie().generalConfig.put({ id: 0, value: newConfig }).then(function () {
-            dispatch(receiveGeneralConfig(newConfig));
+        getDexie().cssConfig.where('id').equals(0).first().then(function (data) {
+            if (data !== undefined) {
+                var config = data.value;
+                dispatch(receiveCSSConfig(config));
+            }
         });
     };
 }
 
+function setCSSConfigAsync(newConfig) {
+    return function (dispatch, getState, _ref5) {
+        var getFirestore = _ref5.getFirestore,
+            getAuth = _ref5.getAuth,
+            getDexie = _ref5.getDexie;
+
+
+        // Update Dexie.
+        getDexie().cssConfig.put({ id: 0, value: newConfig }).then(function () {});
+
+        // Update State.
+        dispatch(receiveCSSConfig(newConfig));
+    };
+}
+
+function setGeneralConfigAsync(newConfig) {
+    return function (dispatch, getState, _ref6) {
+        var getFirestore = _ref6.getFirestore,
+            getAuth = _ref6.getAuth,
+            getDexie = _ref6.getDexie;
+
+        getDexie().generalConfig.put({ id: 0, value: newConfig }).then(function () {});
+
+        // Update State.
+        dispatch(receiveGeneralConfig(newConfig));
+    };
+}
+
 function purgeCompleteTasksAsync() {
-    return function (dispatch, getState, _ref3) {
-        var getFirestore = _ref3.getFirestore,
-            getAuth = _ref3.getAuth,
-            getDexie = _ref3.getDexie;
+    return function (dispatch, getState, _ref7) {
+        var getFirestore = _ref7.getFirestore,
+            getAuth = _ref7.getAuth,
+            getDexie = _ref7.getDexie;
 
         dispatch(setDatabasePurgingFlag(true));
 
@@ -461,9 +566,9 @@ function purgeCompleteTasksAsync() {
 }
 
 function getDatabaseInfoAsync() {
-    return function (dispatch, getState, _ref4) {
-        var getFirestore = _ref4.getFirestore,
-            getAuth = _ref4.getAuth;
+    return function (dispatch, getState, _ref8) {
+        var getFirestore = _ref8.getFirestore,
+            getAuth = _ref8.getAuth;
 
         dispatch(setDatabaseInfo("...Collecting Info"));
 
@@ -507,10 +612,10 @@ function getDatabaseInfoAsync() {
 }
 
 function updateTaskPriority(taskId, newValue) {
-    return function (dispatch, getState, _ref5) {
-        var getFirestore = _ref5.getFirestore,
-            getAuth = _ref5.getAuth,
-            getDexie = _ref5.getDexie;
+    return function (dispatch, getState, _ref9) {
+        var getFirestore = _ref9.getFirestore,
+            getAuth = _ref9.getAuth,
+            getDexie = _ref9.getDexie;
 
         dispatch(closeCalendar());
 
@@ -525,10 +630,10 @@ function updateTaskPriority(taskId, newValue) {
 }
 
 function updateTaskDueDateAsync(taskId, newDate) {
-    return function (dispatch, getState, _ref6) {
-        var getFirestore = _ref6.getFirestore,
-            getAuth = _ref6.getAuth,
-            getDexie = _ref6.getDexie;
+    return function (dispatch, getState, _ref10) {
+        var getFirestore = _ref10.getFirestore,
+            getAuth = _ref10.getAuth,
+            getDexie = _ref10.getDexie;
 
         dispatch(closeCalendar());
 
@@ -544,10 +649,10 @@ function updateTaskDueDateAsync(taskId, newDate) {
 }
 
 function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
-    return function (dispatch, getState, _ref7) {
-        var getFirestore = _ref7.getFirestore,
-            getAuth = _ref7.getAuth,
-            getDexie = _ref7.getDexie;
+    return function (dispatch, getState, _ref11) {
+        var getFirestore = _ref11.getFirestore,
+            getAuth = _ref11.getAuth,
+            getDexie = _ref11.getDexie;
 
         dispatch(setOpenTaskListSettingsMenuId(-1));
 
@@ -563,10 +668,10 @@ function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
 }
 
 function removeTaskListAsync(taskListWidgetId) {
-    return function (dispatch, getState, _ref8) {
-        var getFirestore = _ref8.getFirestore,
-            getAuth = _ref8.getAuth,
-            getDexie = _ref8.getDexie;
+    return function (dispatch, getState, _ref12) {
+        var getFirestore = _ref12.getFirestore,
+            getAuth = _ref12.getAuth,
+            getDexie = _ref12.getDexie;
 
         if (taskListWidgetId !== -1) {
             // Update Firestore.
@@ -594,10 +699,10 @@ function removeTaskListAsync(taskListWidgetId) {
 }
 
 function updateProjectNameAsync(projectId, newValue) {
-    return function (dispatch, getState, _ref9) {
-        var getFirestore = _ref9.getFirestore,
-            getAuth = _ref9.getAuth,
-            getDexie = _ref9.getDexie;
+    return function (dispatch, getState, _ref13) {
+        var getFirestore = _ref13.getFirestore,
+            getAuth = _ref13.getAuth,
+            getDexie = _ref13.getDexie;
 
         // Update Firestore.
         var projectRef = getFirestore().collection(_pounderFirebase.PROJECTS).doc(projectId);
@@ -608,10 +713,10 @@ function updateProjectNameAsync(projectId, newValue) {
 }
 
 function removeProjectAsync(projectId) {
-    return function (dispatch, getState, _ref10) {
-        var getFirestore = _ref10.getFirestore,
-            getAuth = _ref10.getAuth,
-            getDexie = _ref10.getDexie;
+    return function (dispatch, getState, _ref14) {
+        var getFirestore = _ref14.getFirestore,
+            getAuth = _ref14.getAuth,
+            getDexie = _ref14.getDexie;
 
 
         if (getState.selectedProjectId !== -1) {
@@ -656,10 +761,10 @@ function removeProjectAsync(projectId) {
 }
 
 function addNewProjectAsync() {
-    return function (dispatch, getState, _ref11) {
-        var getFirestore = _ref11.getFirestore,
-            getAuth = _ref11.getAuth,
-            getDexie = _ref11.getDexie;
+    return function (dispatch, getState, _ref15) {
+        var getFirestore = _ref15.getFirestore,
+            getAuth = _ref15.getAuth,
+            getDexie = _ref15.getDexie;
 
         // Update Firestore.    
         var newProjectName = "New Project";
@@ -686,10 +791,10 @@ function addNewProjectAsync() {
 }
 
 function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
-    return function (dispatch, getState, _ref12) {
-        var getFirestore = _ref12.getFirestore,
-            getAuth = _ref12.getAuth,
-            getDexie = _ref12.getDexie;
+    return function (dispatch, getState, _ref16) {
+        var getFirestore = _ref16.getFirestore,
+            getAuth = _ref16.getAuth,
+            getDexie = _ref16.getDexie;
 
         if (getState().selectedTask.taskListWidgetId !== taskListWidgetId && getState().selectedTask.taskId !== taskId) {
             dispatch(selectTask(taskListWidgetId, taskId));
@@ -708,10 +813,10 @@ function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
 }
 
 function updateProjectLayoutAsync(layouts, projectId) {
-    return function (dispatch, getState, _ref13) {
-        var getFirestore = _ref13.getFirestore,
-            getAuth = _ref13.getAuth,
-            getDexie = _ref13.getDexie;
+    return function (dispatch, getState, _ref17) {
+        var getFirestore = _ref17.getFirestore,
+            getAuth = _ref17.getAuth,
+            getDexie = _ref17.getDexie;
 
         var newTrimmedLayouts = trimLayoutsHelper(layouts);
 
@@ -724,10 +829,10 @@ function updateProjectLayoutAsync(layouts, projectId) {
 }
 
 function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
-    return function (dispatch, getState, _ref14) {
-        var getFirestore = _ref14.getFirestore,
-            getAuth = _ref14.getAuth,
-            getDexie = _ref14.getDexie;
+    return function (dispatch, getState, _ref18) {
+        var getFirestore = _ref18.getFirestore,
+            getAuth = _ref18.getAuth,
+            getDexie = _ref18.getDexie;
 
         dispatch(closeTask(taskListWidgetId, taskId));
 
@@ -750,10 +855,10 @@ function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
 }
 
 function removeSelectedTaskAsync() {
-    return function (dispatch, getState, _ref15) {
-        var getFirestore = _ref15.getFirestore,
-            getAuth = _ref15.getAuth,
-            getDexie = _ref15.getDexie;
+    return function (dispatch, getState, _ref19) {
+        var getFirestore = _ref19.getFirestore,
+            getAuth = _ref19.getAuth,
+            getDexie = _ref19.getDexie;
 
 
         var taskId = getState().selectedTask.taskId;
@@ -774,10 +879,10 @@ function removeSelectedTaskAsync() {
 }
 
 function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
-    return function (dispatch, getState, _ref16) {
-        var getFirestore = _ref16.getFirestore,
-            getAuth = _ref16.getAuth,
-            getDexie = _ref16.getDexie;
+    return function (dispatch, getState, _ref20) {
+        var getFirestore = _ref20.getFirestore,
+            getAuth = _ref20.getAuth,
+            getDexie = _ref20.getDexie;
 
         var taskListRef = getFirestore().collection(_pounderFirebase.TASKLISTS).doc(taskListWidgetId);
         taskListRef.update({ taskListName: newName }).then(function () {
@@ -787,10 +892,10 @@ function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
 }
 
 function moveTaskAsync(destinationTaskListId) {
-    return function (dispatch, getState, _ref17) {
-        var getFirestore = _ref17.getFirestore,
-            getAuth = _ref17.getAuth,
-            getDexie = _ref17.getDexie;
+    return function (dispatch, getState, _ref21) {
+        var getFirestore = _ref21.getFirestore,
+            getAuth = _ref21.getAuth,
+            getDexie = _ref21.getDexie;
 
         dispatch(startTaskMoveInDatabase());
 
@@ -807,10 +912,10 @@ function moveTaskAsync(destinationTaskListId) {
 }
 
 function addNewTaskAsync() {
-    return function (dispatch, getState, _ref18) {
-        var getFirestore = _ref18.getFirestore,
-            getAuth = _ref18.getAuth,
-            getDexie = _ref18.getDexie;
+    return function (dispatch, getState, _ref22) {
+        var getFirestore = _ref22.getFirestore,
+            getAuth = _ref22.getAuth,
+            getDexie = _ref22.getDexie;
 
         if (getState().focusedTaskListId !== -1) {
             var _getState = getState(),
@@ -835,10 +940,10 @@ function addNewTaskAsync() {
 }
 
 function addNewTaskListAsync() {
-    return function (dispatch, getState, _ref19) {
-        var getFirestore = _ref19.getFirestore,
-            getAuth = _ref19.getAuth,
-            getDexie = _ref19.getDexie;
+    return function (dispatch, getState, _ref23) {
+        var getFirestore = _ref23.getFirestore,
+            getAuth = _ref23.getAuth,
+            getDexie = _ref23.getDexie;
 
         dispatch(startTasklistAdd());
 
@@ -857,11 +962,33 @@ function addNewTaskListAsync() {
     };
 }
 
+function getAccountConfigAsync() {
+    return function (dispatch, getState, _ref24) {
+        var getFirestore = _ref24.getFirestore,
+            getAuth = _ref24.getAuth,
+            getDexie = _ref24.getDexie;
+
+        getFirestore().collection(_pounderFirebase.ACCOUNT).doc(_pounderFirebase.ACCOUNT_DOC_ID).onSnapshot(function (doc) {
+            if (doc.exists) {
+                var accountConfig = doc.data();
+                dispatch(receiveAccountConfig(accountConfig));
+
+                // Dexie returns numbers as strings. Convert "-1" to a number if required.
+                var favouriteProjectId = accountConfig.favouriteProjectId === "-1" ? parseInt(accountConfig.favouriteProjectId) : accountConfig.favouriteProjectId;
+
+                console.log(typeof favouriteProjectId === 'undefined' ? 'undefined' : _typeof(favouriteProjectId));
+
+                dispatch(selectProjectAsync(favouriteProjectId));
+            }
+        });
+    };
+}
+
 function getProjectsAsync() {
-    return function (dispatch, getState, _ref20) {
-        var getFirestore = _ref20.getFirestore,
-            getAuth = _ref20.getAuth,
-            getDexie = _ref20.getDexie;
+    return function (dispatch, getState, _ref25) {
+        var getFirestore = _ref25.getFirestore,
+            getAuth = _ref25.getAuth,
+            getDexie = _ref25.getDexie;
 
         dispatch(startProjectsFetch());
 
@@ -883,10 +1010,10 @@ function getProjectsAsync() {
 }
 
 function getTasksAsync() {
-    return function (dispatch, getState, _ref21) {
-        var getFirestore = _ref21.getFirestore,
-            getAuth = _ref21.getAuth,
-            getDexie = _ref21.getDexie;
+    return function (dispatch, getState, _ref26) {
+        var getFirestore = _ref26.getFirestore,
+            getAuth = _ref26.getAuth,
+            getDexie = _ref26.getDexie;
 
         dispatch(startTasksFetch());
 
@@ -909,10 +1036,10 @@ function getTasksAsync() {
 }
 
 function getTaskListsAsync(projectId) {
-    return function (dispatch, getState, _ref22) {
-        var getFirestore = _ref22.getFirestore,
-            getAuth = _ref22.getAuth,
-            getDexie = _ref22.getDexie;
+    return function (dispatch, getState, _ref27) {
+        var getFirestore = _ref27.getFirestore,
+            getAuth = _ref27.getAuth,
+            getDexie = _ref27.getDexie;
 
         dispatch(startTaskListsFetch());
 
@@ -934,10 +1061,10 @@ function getTaskListsAsync(projectId) {
 }
 
 function getProjectLayoutsAsync(projectId) {
-    return function (dispatch, getState, _ref23) {
-        var getFirestore = _ref23.getFirestore,
-            getAuth = _ref23.getAuth,
-            getDexie = _ref23.getDexie;
+    return function (dispatch, getState, _ref28) {
+        var getFirestore = _ref28.getFirestore,
+            getAuth = _ref28.getAuth,
+            getDexie = _ref28.getDexie;
 
         dispatch(startProjectLayoutsFetch());
 
@@ -961,11 +1088,22 @@ function getProjectLayoutsAsync(projectId) {
     };
 }
 
+function unsubscribeAccountConfigAsync() {
+    return function (dispatch, getState, _ref29) {
+        var getFirestore = _ref29.getFirestore,
+            getAuth = _ref29.getAuth,
+            getDexie = _ref29.getDexie;
+
+        var accountConfigUnsubscribe = getFirestore().collection(_pounderFirebase.ACCOUNT).doc(_pounderFirebase.ACCOUNT_DOC_ID).onSnapshot(function () {});
+        accountConfigUnsubscribe();
+    };
+}
+
 function unsubscribeProjectsAsync() {
-    return function (dispatch, getState, _ref24) {
-        var getFirestore = _ref24.getFirestore,
-            getAuth = _ref24.getAuth,
-            getDexie = _ref24.getDexie;
+    return function (dispatch, getState, _ref30) {
+        var getFirestore = _ref30.getFirestore,
+            getAuth = _ref30.getAuth,
+            getDexie = _ref30.getDexie;
 
         var projectUnsubscribe = getFirestore().collection(_pounderFirebase.PROJECTS).onSnapshot(function () {});
         projectUnsubscribe();
@@ -973,10 +1111,10 @@ function unsubscribeProjectsAsync() {
 }
 
 function unsubscribeTaskListsAsync() {
-    return function (dispatch, getState, _ref25) {
-        var getFirestore = _ref25.getFirestore,
-            getAuth = _ref25.getAuth,
-            getDexie = _ref25.getDexie;
+    return function (dispatch, getState, _ref31) {
+        var getFirestore = _ref31.getFirestore,
+            getAuth = _ref31.getAuth,
+            getDexie = _ref31.getDexie;
 
         var taskListsUnsubscribe = getFirestore().collection(_pounderFirebase.TASKLISTS).onSnapshot(function () {});
         taskListsUnsubscribe();
@@ -984,10 +1122,10 @@ function unsubscribeTaskListsAsync() {
 }
 
 function unsubscribeTasksAsync() {
-    return function (dispatch, getState, _ref26) {
-        var getFirestore = _ref26.getFirestore,
-            getAuth = _ref26.getAuth,
-            getDexie = _ref26.getDexie;
+    return function (dispatch, getState, _ref32) {
+        var getFirestore = _ref32.getFirestore,
+            getAuth = _ref32.getAuth,
+            getDexie = _ref32.getDexie;
 
         var tasksUnsubscribe = getFirestore().collection(_pounderFirebase.TASKS).onSnapshot(function () {});
         tasksUnsubscribe();
@@ -995,10 +1133,10 @@ function unsubscribeTasksAsync() {
 }
 
 function unsubscribeProjectLayoutsAsync() {
-    return function (dispatch, getState, _ref27) {
-        var getFirestore = _ref27.getFirestore,
-            getAuth = _ref27.getAuth,
-            getDexie = _ref27.getDexie;
+    return function (dispatch, getState, _ref33) {
+        var getFirestore = _ref33.getFirestore,
+            getAuth = _ref33.getAuth,
+            getDexie = _ref33.getDexie;
 
         if (getState().selectedProjectId !== -1) {
             var projectLayoutsUnsubscribe = getFirestore().collection(_pounderFirebase.PROJECTLAYOUTS).doc(getState().selectedProjectId).onSnapshot(function () {});
