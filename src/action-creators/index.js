@@ -952,6 +952,8 @@ export function getAccountConfigAsync() {
 
                 dispatch(selectProjectAsync(favouriteProjectId));
             }
+        }, error => {
+            handleFirebaseError(error, getState(), dispatch);
         })
     }
 }
@@ -973,6 +975,8 @@ export function getProjectsAsync() {
 
                 dispatch(receiveProjects(projects));
             }
+        }, error => {
+            handleFirebaseError(error, getState(), dispatch);
         })
     }
 }
@@ -995,6 +999,8 @@ export function getTasksAsync() {
 
                 dispatch(receiveTasks(tasks));
             }
+        }, error => {
+            handleFirebaseError(error, getState(), dispatch);
         })
     }
 }
@@ -1016,6 +1022,8 @@ export function getTaskListsAsync(projectId) {
 
                 dispatch(receiveTaskLists(taskLists));
             }
+        }, error => {
+            handleFirebaseError(error, getState(), dispatch);
         });
     }
 }
@@ -1042,6 +1050,8 @@ export function getProjectLayoutsAsync(projectId) {
 
                 dispatch(receiveProjectLayout(projectLayouts[0]));
             }
+        }, error => {
+            handleFirebaseError(error, getState(), dispatch);
         });
     }
 }
@@ -1084,6 +1094,21 @@ export function unsubscribeProjectLayoutsAsync() {
 }
 
 // Helper Functions.
+function handleFirebaseError(error, state, dispatch) {
+    switch (error.code) {
+        case "permission-denied":
+            if (state.isLoggedIn) {
+                dispatch(postSnackbarMessage(error.message, false))
+            }
+            
+            // No handling required if logged out. Expected behaviour.
+            break;
+        default:
+            throw error;
+    }
+}
+
+
 function parseFirebaseError(error) {
     return "Firebase Error: " + error.code + " " + error.message;
 }
