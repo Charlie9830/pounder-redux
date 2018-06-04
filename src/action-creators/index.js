@@ -17,17 +17,17 @@ export function clearData() {
     }
 }
 
-export function setIsSnackbarOpen(isOpen, isSelfDismissing) {
+export function dismissSnackbar() {
     return {
-        type: ActionTypes.SET_IS_SNACKBAR_OPEN,
-        isOpen: isOpen,
-        isSelfDismissing: isSelfDismissing,
+        type: ActionTypes.DISMISS_SNACKBAR,
     }
 }
-export function setSnackbarMessage(message) {
+
+export function postSnackbarMessage(message, isSelfDismissing) {
     return {
-        type: ActionTypes.SET_SNACKBAR_MESSAGE,
-        value: message,
+        type: ActionTypes.POST_SNACKBAR_MESSAGE,
+        message: message,
+        isSelfDismissing: isSelfDismissing,
     }
 }
 
@@ -425,8 +425,9 @@ export function logOutUserAsync() {
         getAuth().signOut().then( () => {
             
         }).catch(error => {
-            dispatch(setSnackbarMessage("Error Code: " + error.code + " : " + error.message));
-            dispatch(setIsSnackbarOpen(true, false));
+            let message = parseFirebaseError(error);
+            dispatch(postSnackbarMessage(message, false));
+            
         })
     }
 }
@@ -437,9 +438,8 @@ export function logInUserAsync(email,password) {
         dispatch(setAuthStatusMessage("Logging in"));
 
         getAuth().signInWithEmailAndPassword(email, password).catch(error => {
-            var errorMessage = "Error Code: " + error.code + " - " + error.message;
-            dispatch(setSnackbarMessage(errorMessage));
-            dispatch(setIsSnackbarOpen(true, true));
+            let message = parseFirebaseError(error);
+            dispatch(postSnackbarMessage(message, true));
             dispatch(setIsLoggingInFlag(false));
             dispatch(setAuthStatusMessage("Logged out"));
         })
@@ -1084,6 +1084,11 @@ export function unsubscribeProjectLayoutsAsync() {
 }
 
 // Helper Functions.
+function parseFirebaseError(error) {
+    return "Firebase Error: " + error.code + " " + error.message;
+}
+
+
 function parseArgumentsIntoUpdate(update) {
     // stringArgv() will remove single apostraphes, replace them with a \ for now, we will put the apostraphes back in later.
     var taskName = update.taskName.replace(/'/g, "\\");

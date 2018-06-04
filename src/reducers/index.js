@@ -344,19 +344,21 @@ export function appReducer(state, action) {
             }
         }
 
-        case ActionTypes.SET_SNACKBAR_MESSAGE: {
+        case ActionTypes.POST_SNACKBAR_MESSAGE: {
             return {
                 ...state,
-                snackbarMessage: action.value,
+                isSnackbarOpen: true,
+                snackbarMessage: action.message,
+                isSnackbarSelfDismissing: action.isSelfDismissing,
             }
         }
 
-        case ActionTypes.SET_IS_SNACKBAR_OPEN: {
+        case ActionTypes.DISMISS_SNACKBAR: {
             return {
                 ...state,
-                isSnackbarOpen: action.isOpen,
-                isSnackbarSelfDismissing: action.isOpen === false ? false : action.isSelfDismissing, // Reset self Dismiss if closing.
-                snackbarMessage: action.isOpen === false ? "" : state.snackbarMessage, // Wipe message if closing.
+                isSnackbarOpen: false,
+                snackbarMessage: "",
+                isSnackbarSelfDismissing: false,
             }
         }
 

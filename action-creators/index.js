@@ -7,8 +7,8 @@ Object.defineProperty(exports, "__esModule", {
 var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
 
 exports.clearData = clearData;
-exports.setIsSnackbarOpen = setIsSnackbarOpen;
-exports.setSnackbarMessage = setSnackbarMessage;
+exports.dismissSnackbar = dismissSnackbar;
+exports.postSnackbarMessage = postSnackbarMessage;
 exports.setIsLoggedInFlag = setIsLoggedInFlag;
 exports.setUserEmail = setUserEmail;
 exports.setIsLoggingInFlag = setIsLoggingInFlag;
@@ -133,17 +133,17 @@ function clearData() {
     };
 }
 
-function setIsSnackbarOpen(isOpen, isSelfDismissing) {
+function dismissSnackbar() {
     return {
-        type: ActionTypes.SET_IS_SNACKBAR_OPEN,
-        isOpen: isOpen,
-        isSelfDismissing: isSelfDismissing
+        type: ActionTypes.DISMISS_SNACKBAR
     };
 }
-function setSnackbarMessage(message) {
+
+function postSnackbarMessage(message, isSelfDismissing) {
     return {
-        type: ActionTypes.SET_SNACKBAR_MESSAGE,
-        value: message
+        type: ActionTypes.POST_SNACKBAR_MESSAGE,
+        message: message,
+        isSelfDismissing: isSelfDismissing
     };
 }
 
@@ -552,8 +552,8 @@ function logOutUserAsync() {
             getDexie = _ref4.getDexie;
 
         getAuth().signOut().then(function () {}).catch(function (error) {
-            dispatch(setSnackbarMessage("Error Code: " + error.code + " : " + error.message));
-            dispatch(setIsSnackbarOpen(true, false));
+            var message = parseFirebaseError(error);
+            dispatch(postSnackbarMessage(message, false));
         });
     };
 }
@@ -568,9 +568,8 @@ function logInUserAsync(email, password) {
         dispatch(setAuthStatusMessage("Logging in"));
 
         getAuth().signInWithEmailAndPassword(email, password).catch(function (error) {
-            var errorMessage = "Error Code: " + error.code + " - " + error.message;
-            dispatch(setSnackbarMessage(errorMessage));
-            dispatch(setIsSnackbarOpen(true, true));
+            var message = parseFirebaseError(error);
+            dispatch(postSnackbarMessage(message, true));
             dispatch(setIsLoggingInFlag(false));
             dispatch(setAuthStatusMessage("Logged out"));
         });
@@ -1294,6 +1293,10 @@ function unsubscribeProjectLayoutsAsync() {
 }
 
 // Helper Functions.
+function parseFirebaseError(error) {
+    return "Firebase Error: " + error.code + " " + error.message;
+}
+
 function parseArgumentsIntoUpdate(update) {
     // stringArgv() will remove single apostraphes, replace them with a \ for now, we will put the apostraphes back in later.
     var taskName = update.taskName.replace(/'/g, "\\");
