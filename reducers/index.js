@@ -16,6 +16,8 @@ var _pounderUtilities = require('pounder-utilities');
 
 var _pounderStores = require('pounder-stores');
 
+var _pounderFirebase = require('pounder-firebase');
+
 function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
 
 function appReducer(state, action) {
@@ -291,6 +293,62 @@ function appReducer(state, action) {
             {
                 return _extends({}, state, {
                     messageBox: action.value
+                });
+            }
+
+        case ActionTypes.SET_AUTH_STATUS_MESSAGE:
+            {
+                return _extends({}, state, {
+                    authStatusMessage: action.value
+                });
+            }
+
+        case ActionTypes.SET_IS_LOGGING_IN_FLAG:
+            {
+                return _extends({}, state, {
+                    isLoggingIn: action.value
+                });
+            }
+
+        case ActionTypes.SET_IS_LOGGED_IN_FLAG:
+            {
+                return _extends({}, state, {
+                    isLoggedIn: action.value,
+                    isLoggingIn: false
+                });
+            }
+
+        case ActionTypes.SET_USER_EMAIL:
+            {
+                return _extends({}, state, {
+                    userEmail: action.value
+                });
+            }
+
+        case ActionTypes.SET_SNACKBAR_MESSAGE:
+            {
+                return _extends({}, state, {
+                    snackbarMessage: action.value
+                });
+            }
+
+        case ActionTypes.SET_IS_SNACKBAR_OPEN:
+            {
+                return _extends({}, state, {
+                    isSnackbarOpen: action.isOpen,
+                    isSnackbarSelfDismissing: action.isOpen === false ? false : action.isSelfDismissing, // Reset self Dismiss if closing.
+                    snackbarMessage: action.isOpen === false ? "" : state.snackbarMessage // Wipe message if closing.
+                });
+            }
+
+        case ActionTypes.CLEAR_DATA:
+            {
+                return _extends({}, state, {
+                    projects: [],
+                    taskLists: [],
+                    tasks: [],
+                    projectLayout: new _pounderStores.ProjectLayoutStore({}, -1, -1),
+                    accountConfig: _pounderFirebase.AccountConfigFallback
                 });
             }
 

@@ -1,7 +1,7 @@
 import * as ActionTypes from '../action-types/index'
 import { ParseDueDate } from 'pounder-utilities';
 import { ProjectLayoutStore } from 'pounder-stores';
-
+import { AccountConfigFallback } from 'pounder-firebase';
 
 export function appReducer(state, action) {
     switch (action.type) {
@@ -312,6 +312,62 @@ export function appReducer(state, action) {
             return {
                 ...state,
                 messageBox: action.value,
+            }
+        }
+
+        case ActionTypes.SET_AUTH_STATUS_MESSAGE: {
+            return {
+                ...state,
+                authStatusMessage: action.value,
+            }
+        }
+
+        case ActionTypes.SET_IS_LOGGING_IN_FLAG: {
+            return {
+                ...state,
+                isLoggingIn: action.value,
+            }
+        }
+
+        case ActionTypes.SET_IS_LOGGED_IN_FLAG: {
+            return {
+                ...state,
+                isLoggedIn: action.value,
+                isLoggingIn: false,
+            }
+        }
+        
+        case ActionTypes.SET_USER_EMAIL: {
+            return {
+                ...state,
+                userEmail: action.value,
+            }
+        }
+
+        case ActionTypes.SET_SNACKBAR_MESSAGE: {
+            return {
+                ...state,
+                snackbarMessage: action.value,
+            }
+        }
+
+        case ActionTypes.SET_IS_SNACKBAR_OPEN: {
+            return {
+                ...state,
+                isSnackbarOpen: action.isOpen,
+                isSnackbarSelfDismissing: action.isOpen === false ? false : action.isSelfDismissing, // Reset self Dismiss if closing.
+                snackbarMessage: action.isOpen === false ? "" : state.snackbarMessage, // Wipe message if closing.
+            }
+        }
+
+        case ActionTypes.CLEAR_DATA: {
+            return {
+                ...state,
+                projects: [],
+                taskLists: [],
+                tasks: [],
+                projectLayout: new ProjectLayoutStore({}, -1, -1),
+                accountConfig: AccountConfigFallback
             }
         }
 

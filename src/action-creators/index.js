@@ -2,7 +2,7 @@ import * as ActionTypes from '../action-types/index';
 import { PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS, ACCOUNT, ACCOUNT_DOC_ID } from 'pounder-firebase';
 import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore, AccountStore } from 'pounder-stores';
 import Moment from 'moment';
-import { IncludeQueryMetadataChanges } from '../index';
+import { includeMetadataChanges } from '../index';
 import parseArgs from 'minimist';
 import stringArgv from 'string-argv';
 import { getDayPickerDate, getClearedDate, getDaysForwardDate, getWeeksForwardDate, getParsedDate } from 'pounder-utilities';
@@ -11,6 +11,54 @@ const legalArgsRegEx = / -dd | -hp /i;
 const dateFormat = "DD-MM-YYYY";
 
 // Standard Action Creators.
+export function clearData() {
+    return {
+        type: ActionTypes.CLEAR_DATA,
+    }
+}
+
+export function setIsSnackbarOpen(isOpen, isSelfDismissing) {
+    return {
+        type: ActionTypes.SET_IS_SNACKBAR_OPEN,
+        isOpen: isOpen,
+        isSelfDismissing: isSelfDismissing,
+    }
+}
+export function setSnackbarMessage(message) {
+    return {
+        type: ActionTypes.SET_SNACKBAR_MESSAGE,
+        value: message,
+    }
+}
+
+export function setIsLoggedInFlag(isLoggedIn) {
+    return {
+        type: ActionTypes.SET_IS_LOGGED_IN_FLAG,
+        value: isLoggedIn,
+    }
+}
+
+export function setUserEmail(email) {
+    return {
+        type: ActionTypes.SET_USER_EMAIL,
+        value: email,
+    }
+}
+
+export function setIsLoggingInFlag(isLoggingIn) {
+    return {
+        type: ActionTypes.SET_IS_LOGGING_IN_FLAG,
+        value: isLoggingIn,
+    }
+}
+
+export function setAuthStatusMessage(message) {
+    return {
+        type: ActionTypes.SET_AUTH_STATUS_MESSAGE,
+        value: message,
+    }
+}
+
 export function setMessageBox(isOpen, message, type, dataStore, closeCallback) {
     return {
         type: ActionTypes.SET_MESSAGE_BOX,
@@ -322,6 +370,83 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
+export function attachAuthListenerAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        getAuth().onAuthStateChanged(user => {
+            if (user) {
+                // User is Logged in.
+                dispatch(subscribeToDatabaseAsync());
+                dispatch(setIsLoggedInFlag(true));
+                dispatch(setUserEmail(user.email));
+                dispatch(setAuthStatusMessage("Logged in"));
+            }
+
+            else {
+                // User is logged out.
+                dispatch(setAuthStatusMessage("Logged out"));
+                dispatch(unsubscribeFromDatabaseAsync());
+                dispatch(setIsLoggedInFlag(false));
+                dispatch(setUserEmail(""));
+                dispatch(selectProject(-1));
+                dispatch(clearData());
+            }
+        })
+    }
+}
+
+export function subscribeToDatabaseAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        // Get Projects (Also attaches a Value listener for future changes).
+        dispatch(getProjectsAsync());
+
+        // Get Task Lists (Also Attaches a value listener for future changes).
+        dispatch(getTaskListsAsync());
+
+        // Get Tasks (Also attaches a Value listener for future changes).
+        dispatch(getTasksAsync());
+
+        // Get Account Config (Also attaches a Value listener for future changes).
+        dispatch(getAccountConfigAsync());
+    }
+}
+
+export function unsubscribeFromDatabaseAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        dispatch(unsubscribeProjectsAsync());
+        dispatch(unsubscribeTaskListsAsync());
+        dispatch(unsubscribeTasksAsync());
+        dispatch(unsubscribeProjectLayoutsAsync());
+        dispatch(unsubscribeAccountConfigAsync());
+    }
+}
+
+export function logOutUserAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        getAuth().signOut().then( () => {
+            
+        }).catch(error => {
+            dispatch(setSnackbarMessage("Error Code: " + error.code + " : " + error.message));
+            dispatch(setIsSnackbarOpen(true, false));
+        })
+    }
+}
+
+export function logInUserAsync(email,password) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+        dispatch(setIsLoggingInFlag(true));
+        dispatch(setAuthStatusMessage("Logging in"));
+
+        getAuth().signInWithEmailAndPassword(email, password).catch(error => {
+            var errorMessage = "Error Code: " + error.code + " - " + error.message;
+            dispatch(setSnackbarMessage(errorMessage));
+            dispatch(setIsSnackbarOpen(true, true));
+            dispatch(setIsLoggingInFlag(false));
+            dispatch(setAuthStatusMessage("Logged out"));
+        })
+    }
+}
+
+
 export function selectProjectAsync(projectId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         var outgoingProjectId = getState().selectedProjectId;
@@ -836,11 +961,11 @@ export function getProjectsAsync() {
         dispatch(startProjectsFetch());
 
         // Get Projects from Firestore.
-        getFirestore().collection("projects").onSnapshot(IncludeQueryMetadataChanges, snapshot => {
+        getFirestore().collection("projects").onSnapshot(includeMetadataChanges, snapshot => {
             // Handle metadata.
             dispatch(setProjectsHavePendingWrites(snapshot.metadata.hasPendingWrites));
 
-            if (snapshot.docChanges.length > 0) {
+            if (snapshot.docChanges().length > 0) {
                 var projects = [];
                 snapshot.forEach(doc => {
                     projects.push(doc.data());
@@ -857,12 +982,12 @@ export function getTasksAsync() {
         dispatch(startTasksFetch());
 
         // Get Tasks from Firestore.
-        getFirestore().collection(TASKS).orderBy("project").onSnapshot(IncludeQueryMetadataChanges, snapshot => {
+        getFirestore().collection(TASKS).orderBy("project").onSnapshot(includeMetadataChanges, snapshot => {
             // Handle Metadata.
             dispatch(setTasksHavePendingWrites(snapshot.metadata.hasPendingWrites))
 
             // Handle Tasks.
-            if (snapshot.docChanges.length > 0) {
+            if (snapshot.docChanges().length > 0) {
                 var tasks = [];
                 snapshot.forEach(doc => {
                     tasks.push(doc.data());
@@ -879,11 +1004,11 @@ export function getTaskListsAsync(projectId) {
         dispatch(startTaskListsFetch());
 
         // Get Tasklists from Firestore.
-        getFirestore().collection(TASKLISTS).onSnapshot(IncludeQueryMetadataChanges, snapshot => {
+        getFirestore().collection(TASKLISTS).onSnapshot(includeMetadataChanges, snapshot => {
             // Handle Metadata.
             dispatch(setTaskListsHavePendingWrites(snapshot.metadata.hasPendingWrites));
 
-            if (snapshot.docChanges.length > 0) {
+            if (snapshot.docChanges().length > 0) {
                 var taskLists = [];
                 snapshot.forEach(doc => {
                     taskLists.push(doc.data());
@@ -899,11 +1024,11 @@ export function getProjectLayoutsAsync(projectId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
         dispatch(startProjectLayoutsFetch());
 
-        getFirestore().collection(PROJECTLAYOUTS).where("project", "==", projectId).onSnapshot(IncludeQueryMetadataChanges, snapshot => {
+        getFirestore().collection(PROJECTLAYOUTS).where("project", "==", projectId).onSnapshot(includeMetadataChanges, snapshot => {
             // Handle Metadata.
             dispatch(setProjectLayoutsHavePendingWrites(snapshot.metadata.hasPendingWrites));
 
-            if (snapshot.docChanges.length > 0) {
+            if (snapshot.docChanges().length > 0) {
                 var projectLayouts = [];
                 if (snapshot.empty !== true) {
                     snapshot.forEach(doc => {

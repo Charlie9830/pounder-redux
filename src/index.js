@@ -6,7 +6,7 @@ import { setupFirebase, getFirestore, getAuth, AccountConfigFallback } from 'pou
 import { ProjectLayoutStore, CssConfigStore } from 'pounder-stores';
 import { initializeDexie, getDexie, generalConfigFallback } from 'pounder-dexie';
 
-export var IncludeQueryMetadataChanges = { includeQueryMetadataChanges: false }
+export var includeMetadataChanges = { includeMetadataChanges: false }
 
 // Make sure you are calling this first before using the Store.
 export function setupBackend(mode, platform) {
@@ -14,11 +14,11 @@ export function setupBackend(mode, platform) {
     setupFirebase(mode);
     
     if (platform === "desktop") {
-        IncludeQueryMetadataChanges = { includeQueryMetadataChanges: true }
+        includeMetadataChanges = { includeMetadataChanges: true }
     }
 
     else {
-        IncludeQueryMetadataChanges = { includeQueryMetadataChanges: false }
+        includeMetadataChanges = { includeMetadataChanges: false }
     }
 
     // Dexie.
@@ -61,12 +61,19 @@ var initialState = {
     ignoreFullscreenTrigger: false,
     cssConfig: CssConfigStore, // Fallback values for CSS Config already exist within the CSS bundle.
     messageBox: {},
+    authStatusMessage: "",
+    isLoggingIn: false,
+    isLoggedIn: false,
+    userEmail: "",
+    isSnackbarOpen: false,
+    snackbarMessage: "",
+    isSnackbarSelfDismissing: false,
 }
 
 export var appStore = createStore(
     appReducer,
     initialState,
-    applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth, getDexie } ), /* Logger */)
+    applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth, getDexie } ),  /* Logger */ )
 );
 
 // Types.
