@@ -610,6 +610,8 @@ function setFavouriteProjectIdAsync(projectId) {
             favouriteProjectId: projectId
         }).then(function () {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(function (error) {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         });
     };
 }
@@ -709,6 +711,8 @@ function purgeCompleteTasksAsync() {
             // Execute Batch.
             batch.commit().then(function () {
                 dispatch(setDatabasePurgingFlag(false));
+            }).catch(function (error) {
+                handleFirebaseUpdateError(error, getState(), dispatch);
             });
         });
     };
@@ -774,6 +778,8 @@ function updateTaskPriority(taskId, newValue) {
             isHighPriority: newValue
         }).then(function () {
             // Careful what you do here, promises don't resolve if you are offline.
+        }).catch(function (error) {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         });
     };
 }
@@ -793,6 +799,8 @@ function updateTaskDueDateAsync(taskId, newDate) {
             isNewTask: false
         }).then(function () {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(function (error) {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         });
     };
 }
@@ -812,6 +820,8 @@ function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
             settings: Object.assign({}, newValue)
         }).then(function () {
             /// Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(function (error) {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         });
     };
 }
@@ -840,6 +850,8 @@ function removeTaskListAsync(taskListWidgetId) {
 
             batch.commit().then(function () {
                 // Carefull what you do here. Promises don't resolve if you are Offline.
+            }).catch(function (error) {
+                handleFirebaseUpdateError(error, getState(), dispatch);
             });
 
             dispatch(changeFocusedTaskList(-1));
@@ -857,6 +869,8 @@ function updateProjectNameAsync(projectId, newValue) {
         var projectRef = getFirestore().collection(_pounderFirebase.PROJECTS).doc(projectId);
         projectRef.update({ projectName: newValue }).then(function () {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(function (error) {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         });
     };
 }
@@ -904,6 +918,8 @@ function removeProjectAsync(projectId) {
             // Execute the Batch.
             batch.commit().then(function () {
                 // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(function (error) {
+                handleFirebaseUpdateError(error, getState(), dispatch);
             });
         }
     };
@@ -935,6 +951,8 @@ function addNewProjectAsync() {
         // Execute Additions.
         batch.commit().then(function () {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(function (error) {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         });
     };
 }
@@ -957,6 +975,8 @@ function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
             isNewTask: false
         }).then(function () {
             // Carefull what you do here, promises don't resolve if you are offline.h.
+        }).catch(function (error) {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         });
     };
 }
@@ -973,6 +993,8 @@ function updateProjectLayoutAsync(layouts, projectId) {
         var projectLayoutsRef = getFirestore().collection(_pounderFirebase.PROJECTLAYOUTS).doc(projectId);
         projectLayoutsRef.update({ layouts: newTrimmedLayouts }).then(function () {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(function (error) {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         });
     };
 }
@@ -999,6 +1021,8 @@ function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
         var taskRef = getFirestore().collection(_pounderFirebase.TASKS).doc(taskId);
         taskRef.update(newUpdate).then(function () {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(function (error) {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         });
     };
 }
@@ -1020,6 +1044,8 @@ function removeSelectedTaskAsync() {
 
             batch.commit().then(function () {
                 // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(function (error) {
+                handleFirebaseUpdateError(error, getState(), dispatch);
             });
 
             dispatch(selectTask(getState().focusedTaskListId, -1));
@@ -1036,6 +1062,8 @@ function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
         var taskListRef = getFirestore().collection(_pounderFirebase.TASKLISTS).doc(taskListWidgetId);
         taskListRef.update({ taskListName: newName }).then(function () {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(function (error) {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         });
     };
 }
@@ -1054,6 +1082,8 @@ function moveTaskAsync(destinationTaskListId) {
             taskList: destinationTaskListId
         }).then(function () {
             /// Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(function (error) {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         });
 
         dispatch(endTaskMove(movingTaskId, destinationTaskListId));
@@ -1080,7 +1110,9 @@ function addNewTaskAsync() {
 
                 var newTask = new _pounderStores.TaskStore("", "", false, selectedProjectId, focusedTaskListId, newTaskKey, new _moment2.default().toISOString(), true, false);
 
-                newTaskRef.set(Object.assign({}, newTask)).then(function () {});
+                newTaskRef.set(Object.assign({}, newTask)).then(function () {}).catch(function (error) {
+                    handleFirebaseUpdateError(error, getState(), dispatch);
+                });
 
                 dispatch(openTask(newTask.taskList, newTask.uid)); // Opening a Task by convention Selects it.
             }
@@ -1106,6 +1138,8 @@ function addNewTaskListAsync() {
 
             newTaskListRef.set(Object.assign({}, newTaskList)).then(function () {
                 // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(function (error) {
+                handleFirebaseUpdateError(error, getState(), dispatch);
             });
         }
     };
@@ -1128,7 +1162,7 @@ function getAccountConfigAsync() {
                 dispatch(selectProjectAsync(favouriteProjectId));
             }
         }, function (error) {
-            handleFirebaseError(error, getState(), dispatch);
+            handleFirebaseSnapshotError(error, getState(), dispatch);
         });
     };
 }
@@ -1155,7 +1189,7 @@ function getProjectsAsync() {
                 dispatch(receiveProjects(projects));
             }
         }, function (error) {
-            handleFirebaseError(error, getState(), dispatch);
+            handleFirebaseSnapshotError(error, getState(), dispatch);
         });
     };
 }
@@ -1183,7 +1217,7 @@ function getTasksAsync() {
                 dispatch(receiveTasks(tasks));
             }
         }, function (error) {
-            handleFirebaseError(error, getState(), dispatch);
+            handleFirebaseSnapshotError(error, getState(), dispatch);
         });
     };
 }
@@ -1210,7 +1244,7 @@ function getTaskListsAsync(projectId) {
                 dispatch(receiveTaskLists(taskLists));
             }
         }, function (error) {
-            handleFirebaseError(error, getState(), dispatch);
+            handleFirebaseSnapshotError(error, getState(), dispatch);
         });
     };
 }
@@ -1240,7 +1274,7 @@ function getProjectLayoutsAsync(projectId) {
                 dispatch(receiveProjectLayout(projectLayouts[0]));
             }
         }, function (error) {
-            handleFirebaseError(error, getState(), dispatch);
+            handleFirebaseSnapshotError(error, getState(), dispatch);
         });
     };
 }
@@ -1303,7 +1337,7 @@ function unsubscribeProjectLayoutsAsync() {
 }
 
 // Helper Functions.
-function handleFirebaseError(error, state, dispatch) {
+function handleFirebaseSnapshotError(error, state, dispatch) {
     switch (error.code) {
         case "permission-denied":
             if (state.isLoggedIn) {
@@ -1312,6 +1346,22 @@ function handleFirebaseError(error, state, dispatch) {
 
             // No handling required if logged out. Expected behaviour.
             break;
+        default:
+            throw error;
+    }
+}
+
+function handleFirebaseUpdateError(error, state, dispatch) {
+    switch (error.code) {
+        case "permission-denied":
+            if (state.isLoggedIn) {
+                var message = parseFirebaseError(error);
+                dispatch(postSnackbarMessage(message, false));
+            } else {
+                var _message = "You must log in first.";
+                dispatch(postSnackbarMessage(_message, true));
+            }
+
         default:
             throw error;
     }

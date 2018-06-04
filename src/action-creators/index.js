@@ -475,6 +475,8 @@ export function setFavouriteProjectIdAsync(projectId) {
             favouriteProjectId: projectId
         }).then( () => {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         })
     }
 }
@@ -558,6 +560,8 @@ export function purgeCompleteTasksAsync() {
             // Execute Batch.
             batch.commit().then(() => {
                 dispatch(setDatabasePurgingFlag(false));
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
             })
         })
     }
@@ -629,6 +633,8 @@ export function updateTaskPriority(taskId, newValue) {
             isHighPriority: newValue,
         }).then(() => {
             // Careful what you do here, promises don't resolve if you are offline.
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         })
     }
 }
@@ -645,6 +651,8 @@ export function updateTaskDueDateAsync(taskId, newDate) {
             isNewTask: false
         }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         })
     }
 }
@@ -660,6 +668,8 @@ export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
             settings: Object.assign({}, newValue)
         }).then(() => {
             /// Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         })
     }
 }
@@ -684,6 +694,8 @@ export function removeTaskListAsync(taskListWidgetId) {
 
             batch.commit().then(() => {
                 // Carefull what you do here. Promises don't resolve if you are Offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
             })
 
             dispatch(changeFocusedTaskList(-1));
@@ -699,6 +711,8 @@ export function updateProjectNameAsync(projectId, newValue) {
         var projectRef = getFirestore().collection(PROJECTS).doc(projectId);
         projectRef.update({ projectName: newValue }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         })
     }
 }
@@ -740,6 +754,8 @@ export function removeProjectAsync(projectId) {
             // Execute the Batch.
             batch.commit().then(() => {
                 // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
             })
         }
     }
@@ -768,6 +784,8 @@ export function addNewProjectAsync() {
         // Execute Additions.
         batch.commit().then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         })
     }
 }
@@ -790,6 +808,8 @@ export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
             isNewTask: false
         }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.h.
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         })
     }
 }
@@ -802,6 +822,8 @@ export function updateProjectLayoutAsync(layouts, projectId) {
         var projectLayoutsRef = getFirestore().collection(PROJECTLAYOUTS).doc(projectId);
         projectLayoutsRef.update({ layouts: newTrimmedLayouts }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         })
     }
 }
@@ -826,6 +848,8 @@ export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
         var taskRef = getFirestore().collection(TASKS).doc(taskId);
         taskRef.update(newUpdate).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         })
     }
 }
@@ -843,6 +867,8 @@ export function removeSelectedTaskAsync() {
 
             batch.commit().then(() => {
                 // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
             });
 
             dispatch(selectTask(getState().focusedTaskListId, -1));
@@ -856,6 +882,8 @@ export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
         var taskListRef = getFirestore().collection(TASKLISTS).doc(taskListWidgetId);
         taskListRef.update({ taskListName: newName }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         })
     }
 }
@@ -871,6 +899,8 @@ export function moveTaskAsync(destinationTaskListId) {
             taskList: destinationTaskListId
         }).then(() => {
             /// Carefull what you do here, promises don't resolve if you are offline.
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
         })
 
         dispatch(endTaskMove(movingTaskId, destinationTaskListId));
@@ -904,6 +934,8 @@ export function addNewTaskAsync() {
                 )
 
                 newTaskRef.set(Object.assign({}, newTask)).then(() => {
+                }).catch(error => {
+                    handleFirebaseUpdateError(error, getState(), dispatch);
                 })
 
                 dispatch(openTask(newTask.taskList, newTask.uid)); // Opening a Task by convention Selects it.
@@ -933,6 +965,8 @@ export function addNewTaskListAsync() {
 
             newTaskListRef.set(Object.assign({}, newTaskList)).then(() => {
                 // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
             })
         }
     }
@@ -953,7 +987,7 @@ export function getAccountConfigAsync() {
                 dispatch(selectProjectAsync(favouriteProjectId));
             }
         }, error => {
-            handleFirebaseError(error, getState(), dispatch);
+            handleFirebaseSnapshotError(error, getState(), dispatch);
         })
     }
 }
@@ -976,7 +1010,7 @@ export function getProjectsAsync() {
                 dispatch(receiveProjects(projects));
             }
         }, error => {
-            handleFirebaseError(error, getState(), dispatch);
+            handleFirebaseSnapshotError(error, getState(), dispatch);
         })
     }
 }
@@ -1000,7 +1034,7 @@ export function getTasksAsync() {
                 dispatch(receiveTasks(tasks));
             }
         }, error => {
-            handleFirebaseError(error, getState(), dispatch);
+            handleFirebaseSnapshotError(error, getState(), dispatch);
         })
     }
 }
@@ -1023,7 +1057,7 @@ export function getTaskListsAsync(projectId) {
                 dispatch(receiveTaskLists(taskLists));
             }
         }, error => {
-            handleFirebaseError(error, getState(), dispatch);
+            handleFirebaseSnapshotError(error, getState(), dispatch);
         });
     }
 }
@@ -1051,7 +1085,7 @@ export function getProjectLayoutsAsync(projectId) {
                 dispatch(receiveProjectLayout(projectLayouts[0]));
             }
         }, error => {
-            handleFirebaseError(error, getState(), dispatch);
+            handleFirebaseSnapshotError(error, getState(), dispatch);
         });
     }
 }
@@ -1094,7 +1128,7 @@ export function unsubscribeProjectLayoutsAsync() {
 }
 
 // Helper Functions.
-function handleFirebaseError(error, state, dispatch) {
+function handleFirebaseSnapshotError(error, state, dispatch) {
     switch (error.code) {
         case "permission-denied":
             if (state.isLoggedIn) {
@@ -1106,6 +1140,25 @@ function handleFirebaseError(error, state, dispatch) {
         default:
             throw error;
     }
+}
+
+function handleFirebaseUpdateError(error, state, dispatch) {
+    switch (error.code) {
+        case "permission-denied":
+            if (state.isLoggedIn) {
+                let message = parseFirebaseError(error);
+                dispatch(postSnackbarMessage(message, false));
+            }
+
+            else {
+                let message = "You must log in first.";
+                dispatch(postSnackbarMessage(message, true));
+            }
+
+        default:
+            throw error;
+    }
+    
 }
 
 
