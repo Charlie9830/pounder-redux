@@ -437,12 +437,22 @@ export function logInUserAsync(email,password) {
         dispatch(setIsLoggingInFlag(true));
         dispatch(setAuthStatusMessage("Logging in"));
 
-        getAuth().signInWithEmailAndPassword(email, password).catch(error => {
+        // Set Persistence.
+        getAuth().setPersistence('local').then(() => {
+            getAuth().signInWithEmailAndPassword(email, password).catch(error => {
+                let message = parseFirebaseError(error);
+                dispatch(postSnackbarMessage(message, true));
+                dispatch(setIsLoggingInFlag(false));
+                dispatch(setAuthStatusMessage("Logged out"));
+            })
+        }).catch(error => {
             let message = parseFirebaseError(error);
             dispatch(postSnackbarMessage(message, true));
             dispatch(setIsLoggingInFlag(false));
-            dispatch(setAuthStatusMessage("Logged out"));
+            dispatch(setAuthStatusMessage="Logged Out");
         })
+
+
     }
 }
 

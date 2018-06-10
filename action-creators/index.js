@@ -567,11 +567,19 @@ function logInUserAsync(email, password) {
         dispatch(setIsLoggingInFlag(true));
         dispatch(setAuthStatusMessage("Logging in"));
 
-        getAuth().signInWithEmailAndPassword(email, password).catch(function (error) {
+        // Set Persistence.
+        getAuth().setPersistence('local').then(function () {
+            getAuth().signInWithEmailAndPassword(email, password).catch(function (error) {
+                var message = parseFirebaseError(error);
+                dispatch(postSnackbarMessage(message, true));
+                dispatch(setIsLoggingInFlag(false));
+                dispatch(setAuthStatusMessage("Logged out"));
+            });
+        }).catch(function (error) {
             var message = parseFirebaseError(error);
             dispatch(postSnackbarMessage(message, true));
             dispatch(setIsLoggingInFlag(false));
-            dispatch(setAuthStatusMessage("Logged out"));
+            dispatch(exports.setAuthStatusMessage = setAuthStatusMessage = "Logged Out");
         });
     };
 }
