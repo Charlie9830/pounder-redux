@@ -2,7 +2,7 @@ import { createStore, applyMiddleware } from 'redux';
 import { appReducer } from './reducers/index';
 import Logger from 'redux-logger';
 import ReduxThunk from 'redux-thunk';
-import { setupFirebase, getFirestore, getAuth, AccountConfigFallback } from 'pounder-firebase';
+import { setupFirebase, getFirestore, getAuth, getFunctions, AccountConfigFallback } from 'pounder-firebase';
 import { ProjectLayoutStore, CssConfigStore } from 'pounder-stores';
 import { initializeDexie, getDexie, generalConfigFallback } from 'pounder-dexie';
 
@@ -27,6 +27,7 @@ export function setupBackend(mode, platform) {
 
 var initialState = {
     projects: [],
+    remoteProjectIds: [],
     taskLists: [],
     tasks: [],
     focusedTaskListId: -1,
@@ -65,15 +66,20 @@ var initialState = {
     isLoggingIn: false,
     isLoggedIn: false,
     userEmail: "",
+    displayName: "ConeBone69",
     isSnackbarOpen: false,
     snackbarMessage: "",
     isSnackbarSelfDismissing: false,
+    isSidebarOpen: true,
+    isShareMenuOpen: false,
+    isInvitingUser: false,
+    inviteUserMessage: "",
 }
 
 export var appStore = createStore(
     appReducer,
     initialState,
-    applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth, getDexie } ),  /* Logger */ )
+    applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth, getDexie, getFunctions } ),  /* Logger */ )
 );
 
 // Types.

@@ -22,6 +22,10 @@ function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj;
 
 function appReducer(state, action) {
     switch (action.type) {
+        case ActionTypes.RECEIVE_REMOTE_PROJECTS:
+            return _extends({}, state, {
+                remoteProjects: action.value
+            });
         case ActionTypes.CHANGE_FOCUSED_TASKLIST:
             return _extends({}, state, {
                 focusedTaskListId: action.id,
@@ -57,6 +61,11 @@ function appReducer(state, action) {
         case ActionTypes.CLOSE_TASK:
             return _extends({}, state, {
                 selectedTask: { taskListWidgetId: action.taskListWidgetId, taskId: action.taskId, isInputOpen: false }
+            });
+
+        case ActionTypes.SET_IS_SIDEBAR_OPEN:
+            return _extends({}, state, {
+                isSidebarOpen: action.value
             });
 
         case ActionTypes.START_TASK_MOVE:
@@ -163,6 +172,12 @@ function appReducer(state, action) {
             return _extends({}, state, {
                 isAwaitingFirebase: false,
                 projectLayout: action.projectLayout
+            });
+
+        case ActionTypes.RECEIVE_REMOTE_PROJECT_LAYOUT:
+            return _extends({}, state, {
+                isAwaitingFirebase: false,
+                remoteProjectLayout: action.projectLayout
             });
 
         case ActionTypes.SELECT_PROJECT:
@@ -351,6 +366,41 @@ function appReducer(state, action) {
                     tasks: [],
                     projectLayout: new _pounderStores.ProjectLayoutStore({}, -1, -1),
                     accountConfig: _pounderFirebase.AccountConfigFallback
+                });
+            }
+
+        case ActionTypes.SET_IS_SHARE_MENU_OPEN:
+            {
+                return _extends({}, state, {
+                    isShareMenuOpen: action.value
+                });
+            }
+
+        case ActionTypes.SET_IS_INVITING_USER:
+            {
+                return _extends({}, state, {
+                    isInvitingUser: action.value
+                });
+            }
+
+        case ActionTypes.SET_INVITE_USER_MESSAGE:
+            {
+                return _extends({}, state, {
+                    inviteUserMessage: action.value
+                });
+            }
+
+        case ActionTypes.SET_DISPLAY_NAME:
+            {
+                return _extends({}, state, {
+                    displayName: action.value
+                });
+            }
+
+        case ActionTypes.RECEIVE_REMOTE_PROJECT_IDS:
+            {
+                return _extends({}, state, {
+                    remoteProjectIds: action.value
                 });
             }
 

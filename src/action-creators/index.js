@@ -1,6 +1,8 @@
 import * as ActionTypes from '../action-types/index';
-import { PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS, ACCOUNT, ACCOUNT_DOC_ID } from 'pounder-firebase';
-import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore, AccountStore } from 'pounder-stores';
+import { setUserUid, getUserUid, USERS, PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS, ACCOUNT, ACCOUNT_DOC_ID,
+     REMOTE_IDS, REMOTES } from 'pounder-firebase';
+import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore, CssConfigStore, 
+InviteStore, RemoteStore} from 'pounder-stores';
 import Moment from 'moment';
 import { includeMetadataChanges } from '../index';
 import parseArgs from 'minimist';
@@ -11,6 +13,45 @@ const legalArgsRegEx = / -dd | -hp /i;
 const dateFormat = "DD-MM-YYYY";
 
 // Standard Action Creators.
+export function receiveRemoteProjects(projects) {
+    return {
+        type: ActionTypes.RECEIVE_REMOTE_PROJECTS,
+        value: projects,
+    }
+}
+
+export function setDisplayName(displayName) {
+    return {
+        type: ActionTypes.SET_DISPLAY_NAME,
+        value: displayName,
+    }
+}
+export function setInviteUserMessage(message) {
+    return {
+        type: ActionTypes.SET_INVITE_USER_MESSAGE,
+        value: message,
+    }
+}
+
+export function setIsInvitingUser(value) {
+    return {
+        type: ActionTypes.SET_IS_INVITING_USER,
+        value: value,
+    }
+}
+
+export function setIsShareMenuOpen(isOpen) {
+    return {
+        type: ActionTypes.SET_IS_SHARE_MENU_OPEN,
+        value: isOpen,
+    }
+}
+export function setIsSidebarOpen(isOpen) {
+    return {
+        type: ActionTypes.SET_IS_SIDEBAR_OPEN,
+        value: isOpen,
+    }
+}
 export function clearData() {
     return {
         type: ActionTypes.CLEAR_DATA,
@@ -225,6 +266,13 @@ export function receiveTasks(tasks) {
     }
 }
 
+export function receiveRemoteTasks(tasks) {
+    return {
+        type: ActionTypes.RECEIVE_REMOTE_TASKS,
+        remoteTasks: tasks
+    }
+}
+
 export function lockApp() {
     return {
         type: ActionTypes.LOCK_APP,
@@ -297,6 +345,13 @@ export function receiveProjectLayout(projectLayout) {
     }
 }
 
+export function receiveRemoteProjectLayout(projectLayout) {
+    return {
+        type: ActionTypes.RECEIVE_REMOTE_PROJECT_LAYOUT,
+        projectLayout: projectLayout
+    }
+}
+
 export function selectProject(projectId) {
     return {
         type: ActionTypes.SELECT_PROJECT,
@@ -357,6 +412,12 @@ export function receiveGeneralConfig(config) {
     }
 }
 
+export function receiveRemoteProjectIds(ids) {
+    return {
+        type: ActionTypes.RECEIVE_REMOTE_PROJECT_IDS,
+        value: ids
+    }
+}
 
 // Private Actions.
 // Should only be dispatched by moveTaskAsync(), as moveTaskAsync() gets the movingTaskId from the State. Calling this from elsewhere
@@ -370,11 +431,165 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
+export function getRemoteProjectIdsAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        getFirestore().collection(USERS).doc(getUserUid()).collection(REMOTE_IDS).onSnapshot( snapshot => {
+            if (snapshot.docChanges().length > 0) {
+                var remoteProjectIds = []
+
+                snapshot.forEach(doc => {
+                    remoteProjectIds.push(doc.data());
+                })
+
+                dispatch(receiveRemoteProjectIds(remoteProjectIds));
+
+                snapshot.docChanges().forEach(change => {
+                    if (change.type === "added") {
+                        dispatch(subscribeToRemoteProjectAsync(change.doc.data()));
+                    }
+
+                    if (change.type === "removed") {
+                        dispatch(unsubscribeFromRemoteProjectAsync(change.doc.data()));
+                    }
+                });
+        
+            }
+        }, error => {
+            handleFirebaseSnapshotError(error, getState(), dispatch);
+        })
+    }
+}
+
+export function subscribeToRemoteProjectAsync(projectId) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        // Top Level Project Info.
+        getFirestore().collection(REMOTE_PROJECTS).doc(projectId).onSnapshot( doc => {
+            if (doc.exists) {
+                var projectName = doc.get('projectName');
+                var members = doc.get('members');
+
+                filteredProjects = getState().projects.filter(item => {
+                    return item.uid !== doc.uid;
+                })
+
+                filterProjects.push({ projectName: projectName, members: members, uid: doc.uid});
+                dispatch(receiveProjects(filteredProjects));
+            }
+        })
+
+        // TaskLists.
+        getFirestore().collection(REMOTE_PROJECTS).doc(projectId).collection(TASKLISTS).onSnapshot(snapshot => {
+            handleTaskListsSnapshot(dispatch, true, snapshot, projectId);
+        })
+
+        // Tasks.
+        getFirestore().collection(REMOTE_PROJECTS).doc(projectId).collection(TASKS).orderBy('project').onSnapshot(snapshot => {
+            handleTasksSnapshot(getState, dispatch, true, snapshot, remoteProjectId);
+        })
+
+        // ProjectLayout.
+        getFirestore().collection(REMOTE_PROJECTS).doc(projectId).collection(PROJECTLAYOUTS).onSnapshot(snapshot => {
+            handleProjectLayoutsSnapshot(dispatch, true, snapshot);
+        })
+    }
+}
+
+export function unsubscribeFromRemoteProjectAsync(projectId) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        // Project.
+        var projectUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).onSnapshot(doc => {})
+        projectUnsubscribe();
+        
+        // TaskLists.
+        var taskListsUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).collection(TASKLISTS).onSnapshot(snapshot => {})
+        taskListsUnsubscribe();
+
+        // Tasks.
+        var tasksUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).collection(TASKS).onSnapshot(snapshot => {})
+        tasksUnsubscribe();
+
+        // ProjectLayout.
+        var projectLayoutsUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).collection(PROJECTLAYOUTS).onSnapshot(snapshot => {})
+        projectLayoutsUnsubscribe();
+    }
+}
+
+
+export function makeProjectRemoteAsync(projectId, projectName) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        // Transfer Project.
+        var userRef = getfirestore().collection(USERS).doc(getUserUid());
+        var batch = getFirestore().batch();
+
+        // Top Level Project Data.
+        var topLevelData = { 
+            uid: projectId,
+            projectName: projectName,
+            members: [new MemberStore(getUserUid(), getState().displayName, getState().userEmail)]}
+        var topLevelRef = getFirestore().collection(REMOTES).doc(projectId);
+        batch.set(topLevelRef, topLevelData);
+
+        // Project Layout
+        requests.push(userRef.collection(PROJECTLAYOUTS).doc(projectId).get().then( layoutDoc => {
+            if (layoutDoc.exists) {
+                var ref = getFirestore().collection(REMOTES).doc(projectId).collection(PROJECTLAYOUTS).doc(layoutDoc.id);
+                batch.set(ref, layoutDoc.data());
+            }
+        }));
+
+        // Task Lists.
+        requests.push(userRef.collection(TASKLISTS).where('project', '==', projectId).get().then( taskListsSnapshot => {
+            if (taskListsSnapshot.exists) {
+                taskListsSnapshot.forEach( taskListDoc => {
+                    var ref = getFirestore.collection(REMOTES).doc(projectId).collection(TASKLISTS).doc(taskListDoc.id);
+                    batch.set(ref, taskListDoc.data());
+                })
+            }
+        }));
+
+        // Tasks.
+        requests.push(userRef.collection(TASKS).where('project', '==', projectId).get().then( tasksSnapshot => {
+            if (tasksSnapshot.exists) {
+                tasksSnapshot.forEach( taskDoc => {
+                    var ref = getFirestore.collection(REMOTES).doc(projectId).collection(TASKS).doc(taskDoc.id);
+                    batch.set(ref, taskDoc.data());
+                })
+            }
+        }));
+
+        Promise.all(requests).then(() => {
+            batch.commit().then(() => {
+                // Delete Original Project from Local Location.
+                dispatch(removeProjectAsync(projectId));
+
+                // Add the Id of the project to the users RemoteProjectId's collection.
+                ref = getFirestore().collection(USERS).doc(getUserUid()).collection(REMOTE_IDS).doc();
+                ref.set({ remoteId: projectId }).then(() => {
+                    // Success.
+                }).catch(error => {
+                    dispatch(postSnackbarMessage('Error while creating entry in remoteIds ' + error.message, false));
+                })
+
+            }).catch(error => {
+                dispatch(postSnackbarMessage('Error while moving Local Project: ' + error.message, false));
+            })
+        })
+    }
+}
+
+
+export function inviteUserToProjectAsync(projectName, targetEmail, sourceEmail, sourceDisplayName, projectId, isRemote) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(setIsInvitingUser(true));
+    }
+}
+
 export function attachAuthListenerAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         getAuth().onAuthStateChanged(user => {
             if (user) {
                 // User is Logged in.
+                setUserUid(user.uid);
                 dispatch(subscribeToDatabaseAsync());
                 dispatch(setIsLoggedInFlag(true));
                 dispatch(setUserEmail(user.email));
@@ -383,21 +598,30 @@ export function attachAuthListenerAsync() {
 
             else {
                 // User is logged out.
-                dispatch(setAuthStatusMessage("Logged out"));
-                dispatch(unsubscribeFromDatabaseAsync());
-                dispatch(setIsLoggedInFlag(false));
-                dispatch(setUserEmail(""));
-                dispatch(selectProject(-1));
-                dispatch(clearData());
+                // This Code may be called when App is booting up. If getUserUid is an empty string, then the App is booting
+                // and no action is required.
+                if (getUserUid() !== "") {
+                    dispatch(setAuthStatusMessage("Logged out"));
+                    dispatch(unsubscribeFromDatabaseAsync());
+                    dispatch(setIsLoggedInFlag(false));
+                    dispatch(setUserEmail(""));
+                    dispatch(selectProject(-1));
+                    dispatch(clearData());
+
+                    setUserUid(""); // Clear UserUid Last as actions above may require it to build valid Database References.
+                }
             }
         })
     }
 }
 
 export function subscribeToDatabaseAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         // Get Projects (Also attaches a Value listener for future changes).
         dispatch(getProjectsAsync());
+
+        // Remote Projects (Also attaches a Value listener for future changes).
+        dispatch(getRemoteProjectIdsAsync());
 
         // Get Task Lists (Also Attaches a value listener for future changes).
         dispatch(getTaskListsAsync());
@@ -411,8 +635,9 @@ export function subscribeToDatabaseAsync() {
 }
 
 export function unsubscribeFromDatabaseAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(unsubscribeProjectsAsync());
+        dispatch(unsubscribeFromRemoteProjectAsync());
         dispatch(unsubscribeTaskListsAsync());
         dispatch(unsubscribeTasksAsync());
         dispatch(unsubscribeProjectLayoutsAsync());
@@ -421,7 +646,7 @@ export function unsubscribeFromDatabaseAsync() {
 }
 
 export function logOutUserAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         getAuth().signOut().then( () => {
             
         }).catch(error => {
@@ -433,7 +658,7 @@ export function logOutUserAsync() {
 }
 
 export function logInUserAsync(email,password) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(setIsLoggingInFlag(true));
         dispatch(setAuthStatusMessage("Logging in"));
 
@@ -458,28 +683,26 @@ export function logInUserAsync(email,password) {
 
 
 export function selectProjectAsync(projectId) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         var outgoingProjectId = getState().selectedProjectId;
         var incomingProjectId = projectId;
 
         if (outgoingProjectId !== -1) {
             // Old Listeners.
-            dispatch(unsubscribeProjectLayoutsAsync());
-        }
+            dispatch(unsubscribeProjectLayoutsAsync(projectId));
+        } 
 
         if (incomingProjectId !== -1) {
             dispatch(getProjectLayoutsAsync(projectId));
         }
 
         dispatch(selectProject(projectId));
-
     }
 }
 
-
 export function setFavouriteProjectIdAsync(projectId) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
-        var ref = getFirestore().collection(ACCOUNT).doc(ACCOUNT_DOC_ID);
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        var ref = getFirestore().collection(USERS).doc(getUserUid()).collection(ACCOUNT).doc(ACCOUNT_DOC_ID);
 
         ref.set({
             favouriteProjectId: projectId
@@ -493,7 +716,7 @@ export function setFavouriteProjectIdAsync(projectId) {
 
 
 export function getGeneralConfigAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         getDexie().generalConfig.where('id').equals(0).first().then(data => {
             if (data !== undefined) {
                 var config = data.value;
@@ -504,7 +727,7 @@ export function getGeneralConfigAsync() {
                     syncAppToConfig(config, dispatch);
                 }
             }
-            // If data doesn't exist in Dexie we can safely that the Fallback values given to the initial state
+            // If data doesn't exist in Dexie we can safely assume that the Fallback values given to the initial state
             // are still correct.
             if (getState().isStartingUp) {
                 syncAppToConfig(getState().generalConfig, dispatch);
@@ -514,18 +737,41 @@ export function getGeneralConfigAsync() {
 }
 
 export function getCSSConfigAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         getDexie().cssConfig.where('id').equals(0).first().then(data => {
             if (data !== undefined) {
-                var config = data.value;
-                dispatch(receiveCSSConfig(config));
+                // User has modified values.
+                // Combine current State with values returned from Dexie.
+                var configFromDB = data.value;
+                var existingConfig = getState().cssConfig;
+                var newConfig = {...existingConfig};
+                for (var propertyName in configFromDB) {
+                    newConfig[propertyName] = configFromDB[propertyName];
+                }
+                
+                dispatch(receiveCSSConfig(newConfig));
             }
+
+            // Nothing returned from Dexie. This means the user hasn't modified any values so we can rely on the
+            // default values provided to the initial state.
         })
     }
 }
 
+export function setAllColorsToDefaultAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+
+        // Update Dexie.
+        getDexie().cssConfig.put({ id: 0, value: CssConfigStore }).then(() => {
+        })
+
+        // Update State.
+        dispatch(receiveCSSConfig(CssConfigStore));
+    }
+}
+
 export function setCSSConfigAsync(newConfig) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
 
         // Update Dexie.
         getDexie().cssConfig.put({ id: 0, value: newConfig }).then(() => {
@@ -537,7 +783,7 @@ export function setCSSConfigAsync(newConfig) {
 }
 
 export function setGeneralConfigAsync(newConfig) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         getDexie().generalConfig.put({ id: 0, value: newConfig }).then(() => {
             
         })
@@ -548,10 +794,10 @@ export function setGeneralConfigAsync(newConfig) {
 }
 
 export function purgeCompleteTasksAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(setDatabasePurgingFlag(true));
 
-        getFirestore().collection(TASKS).get().then(snapshot => {
+        getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).get().then(snapshot => {
             // Collect Id's of completed Tasks.
             var completedTaskIds = [];
             snapshot.forEach(doc => {
@@ -579,7 +825,7 @@ export function purgeCompleteTasksAsync() {
 
 
 export function getDatabaseInfoAsync() {
-    return (dispatch, getState, { getFirestore, getAuth }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(setDatabaseInfo("...Collecting Info"));
 
         var projectCount = getState().projects.length;
@@ -634,11 +880,13 @@ export function getDatabaseInfoAsync() {
 }
 
 export function updateTaskPriority(taskId, newValue) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(closeCalendar());
 
+        // Determine Reference.
+        var taskRef = getTaskRef(getFirestore, getState, taskId);
+
         // Update Firestore.
-        var taskRef = getFirestore().collection(TASKS).doc(taskId);
         taskRef.update({
             isHighPriority: newValue,
         }).then(() => {
@@ -649,13 +897,12 @@ export function updateTaskPriority(taskId, newValue) {
     }
 }
 
-
 export function updateTaskDueDateAsync(taskId, newDate) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(closeCalendar());
 
         // Update Firestore.
-        var taskRef = getFirestore().collection(TASKS).doc(taskId);
+        var taskRef = getTaskRef(getFirestore, getState, taskId);
         taskRef.update({
             dueDate: newDate,
             isNewTask: false
@@ -668,11 +915,11 @@ export function updateTaskDueDateAsync(taskId, newDate) {
 }
 
 export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(setOpenTaskListSettingsMenuId(-1));
 
         // Update Firestore.
-        var taskListRef = getFirestore().collection(TASKLISTS).doc(taskListWidgetId);
+        var taskListRef = getTaskListRef(getFirestore, getState, taskListWidgetId);
 
         taskListRef.update({
             settings: Object.assign({}, newValue)
@@ -684,8 +931,9 @@ export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
     }
 }
 
+
 export function removeTaskListAsync(taskListWidgetId) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (taskListWidgetId !== -1) {
             // Update Firestore.
             // Collect related TaskIds.
@@ -694,13 +942,24 @@ export function removeTaskListAsync(taskListWidgetId) {
             // Build Batch.
             var batch = getFirestore().batch();
 
-            // Task lists
-            batch.delete(getFirestore().collection(TASKLISTS).doc(taskListWidgetId));
+            // Task list
+            var taskListRef = getTaskListRef(getFirestore, getState, taskListWidgetId);
+            batch.delete(taskListRef);
 
             // Tasks.
-            taskIds.forEach(id => {
-                batch.delete(getFirestore().collection(TASKS).doc(id));
-            })
+            if (isProjectRemote(getState, getState().selectedProjectId)) {
+                var selectedProjectId = getState().selectedProjectId;
+                taskIds.forEach(id => {
+                    batch.delete(getFirestore().collection(REMOTES).doc(selectedProjectId).collection(TASKS).doc(id));
+                })
+            }
+
+            else {
+                taskIds.forEach(id => {
+                    batch.delete(getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).doc(id));
+                })
+            }
+            
 
             batch.commit().then(() => {
                 // Carefull what you do here. Promises don't resolve if you are Offline.
@@ -716,9 +975,9 @@ export function removeTaskListAsync(taskListWidgetId) {
 
 
 export function updateProjectNameAsync(projectId, newValue) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         // Update Firestore.
-        var projectRef = getFirestore().collection(PROJECTS).doc(projectId);
+        var projectRef = getProjectRef(getFirestore, getState, projectId);
         projectRef.update({ projectName: newValue }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(error => {
@@ -728,7 +987,7 @@ export function updateProjectNameAsync(projectId, newValue) {
 }
 
 export function removeProjectAsync(projectId) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
 
         if (getState.selectedProjectId !== -1) {
             // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
@@ -742,24 +1001,40 @@ export function removeProjectAsync(projectId) {
             // Build Updates.
             var batch = getFirestore().batch();
 
-            // Tasklists.
-            taskListIds.forEach(id => {
-                batch.delete(getFirestore().collection(TASKLISTS).doc(id));
-            })
+            // Remote.
+            if (isProjectRemote(getState, projectId)) {
+                // TaskLists.
+                taskListIds.forEach(id => {
+                    batch.delete(getFirestore().collection(REMOTES).doc(projectId).collection(TASKLISTS).doc(id));
+                })
 
-            // Tasks
-            taskIds.forEach(id => {
-                batch.delete(getFirestore().collection(TASKS).doc(id));
-            })
+                // Tasks
+                taskIds.forEach(id => {
+                    batch.delete(getFirestore().collection(REMOTES).doc(projectId).collection(TASKS).doc(id));
+                })
+            }
+            
+            // Local
+            else {
+                // TaskLists.
+                taskListIds.forEach(id => {
+                    batch.delete(getFirestore().collection(USERS).doc(getUserUid()).collection(TASKLISTS).doc(id));
+                })
 
+                // Tasks
+                taskIds.forEach(id => {
+                    batch.delete(getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).doc(id));
+                })
+            }
+            
             // Project Layout
             var projectLayoutId = getState().projectLayout.uid;
             if (projectLayoutId !== -1) {
-                batch.delete(getFirestore().collection(PROJECTLAYOUTS).doc(projectLayoutId));
+                batch.delete(getProjectLayoutRef(getFirestore, getState, projectLayoutId));
             }
 
             // Project.
-            batch.delete(getFirestore().collection(PROJECTS).doc(projectId));
+            batch.delete(getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).doc(projectId));
 
             // Execute the Batch.
             batch.commit().then(() => {
@@ -773,20 +1048,20 @@ export function removeProjectAsync(projectId) {
 
 
 export function addNewProjectAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         // Update Firestore.    
         var newProjectName = "New Project";
         var batch = getFirestore().batch();
 
         // Project.
-        var newProjectRef = getFirestore().collection(PROJECTS).doc();
+        var newProjectRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).doc();
         var newProjectKey = newProjectRef.id;
 
-        var newProject = new ProjectStore(newProjectName, newProjectKey);
+        var newProject = new ProjectStore(newProjectName, newProjectKey, false);
         batch.set(newProjectRef, Object.assign({}, newProject));
 
         // Layout
-        var newLayoutRef = getFirestore().collection(PROJECTLAYOUTS).doc(newProjectKey);
+        var newLayoutRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTLAYOUTS).doc(newProjectKey);
 
         var newProjectLayout = new ProjectLayoutStore({}, newProjectKey, newProjectKey);
         batch.set(newLayoutRef, Object.assign({}, newProjectLayout));
@@ -800,18 +1075,15 @@ export function addNewProjectAsync() {
     }
 }
 
-
-
-
 export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (getState().selectedTask.taskListWidgetId !== taskListWidgetId &&
             getState().selectedTask.taskId !== taskId) {
             dispatch(selectTask(taskListWidgetId, taskId));
         }
 
         // Update Firestore.
-        var taskRef = getFirestore().collection(TASKS).doc(taskId);
+        var taskRef = getTaskRef(getFirestore, getState, taskId);
 
         taskRef.update({
             isComplete: newValue,
@@ -825,11 +1097,11 @@ export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
 }
 
 export function updateProjectLayoutAsync(layouts, projectId) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         var newTrimmedLayouts = trimLayoutsHelper(layouts);
 
         // Update Firestore.
-        var projectLayoutsRef = getFirestore().collection(PROJECTLAYOUTS).doc(projectId);
+        var projectLayoutsRef = getProjectLayoutRef(getFirestore, getState, projectId);
         projectLayoutsRef.update({ layouts: newTrimmedLayouts }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(error => {
@@ -840,10 +1112,8 @@ export function updateProjectLayoutAsync(layouts, projectId) {
 
 
 export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(closeTask(taskListWidgetId, taskId));
-
-        // TODO: Notify of Firebase Request.
 
         var update = {
             taskName: newData,
@@ -855,7 +1125,7 @@ export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
 
 
         // Update Firestore.
-        var taskRef = getFirestore().collection(TASKS).doc(taskId);
+        var taskRef = getTaskRef(getFirestore, getState, taskId);
         taskRef.update(newUpdate).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(error => {
@@ -865,14 +1135,14 @@ export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
 }
 
 export function removeSelectedTaskAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
 
         var taskId = getState().selectedTask.taskId;
         if (taskId !== -1) {
             // Update Firestore.    
             // Build Batch and Execute.
             var batch = getFirestore().batch();
-            var taskRef = getFirestore().collection(TASKS).doc(taskId);
+            var taskRef = getTaskRef(getFirestore, getState, taskId);
             batch.delete(taskRef);
 
             batch.commit().then(() => {
@@ -888,8 +1158,10 @@ export function removeSelectedTaskAsync() {
 
 
 export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
-        var taskListRef = getFirestore().collection(TASKLISTS).doc(taskListWidgetId);
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+
+        var taskListRef = getTaskListRef(getFirestore, getState, taskListWidgetId);
+
         taskListRef.update({ taskListName: newName }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(error => {
@@ -900,11 +1172,12 @@ export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
 
 
 export function moveTaskAsync(destinationTaskListId) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(startTaskMoveInDatabase());
 
         var movingTaskId = getState().movingTaskId;
-        var taskRef = getFirestore().collection(TASKS).doc(movingTaskId);
+        var taskRef = getTaskRef(getFirestore, getState, movingTaskId);
+
         taskRef.update({
             taskList: destinationTaskListId
         }).then(() => {
@@ -919,7 +1192,7 @@ export function moveTaskAsync(destinationTaskListId) {
 
 
 export function addNewTaskAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (getState().focusedTaskListId !== -1) {
 
             const { selectedProjectId, focusedTaskListId } = getState();
@@ -928,7 +1201,15 @@ export function addNewTaskAsync() {
                 // Add a new Task.
                 dispatch(startTaskAdd());
 
-                var newTaskRef = getFirestore().collection(TASKS).doc();
+                var newTaskRef;
+                if (isProjectRemote(getState, getState().selectedProjectId)) {
+                    newTaskRef = getFirestore().collection(REMOTES).doc(getState().selectedProjectId).collection(TASKS).doc();
+                }
+
+                else {
+                    newTaskRef = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).doc();
+                }
+                
                 var newTaskKey = newTaskRef.id;
 
                 var newTask = new TaskStore(
@@ -956,14 +1237,22 @@ export function addNewTaskAsync() {
 }
 
 export function addNewTaskListAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(startTasklistAdd());
 
         var selectedProjectId = getState().selectedProjectId;
 
         if (selectedProjectId !== -1) {
             // Add to Firestore.
-            var newTaskListRef = getFirestore().collection(TASKLISTS).doc();
+            var newTaskListRef;
+
+            if (isProjectRemote(getState, selectedProjectId)) {
+                newTaskListRef = getFirestore().collection(REMOTES).doc(selectedProjectId).collection(TASKLISTS).doc();
+            }
+            
+            else {
+                newTaskListRef = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKLISTS).doc();
+            }
 
             var newTaskList = new TaskListStore(
                 "New Task List",
@@ -983,8 +1272,8 @@ export function addNewTaskListAsync() {
 }
 
 export function getAccountConfigAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
-        getFirestore().collection(ACCOUNT).doc(ACCOUNT_DOC_ID).onSnapshot( doc => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        getFirestore().collection(USERS).doc(getUserUid()).collection(ACCOUNT).doc(ACCOUNT_DOC_ID).onSnapshot( doc => {
             if (doc.exists) {
                 var accountConfig = doc.data();
                 dispatch(receiveAccountConfig(accountConfig));
@@ -1003,11 +1292,11 @@ export function getAccountConfigAsync() {
 }
 
 export function getProjectsAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(startProjectsFetch());
 
         // Get Projects from Firestore.
-        getFirestore().collection("projects").onSnapshot(includeMetadataChanges, snapshot => {
+        getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).onSnapshot(includeMetadataChanges, snapshot => {
             // Handle metadata.
             dispatch(setProjectsHavePendingWrites(snapshot.metadata.hasPendingWrites));
 
@@ -1026,118 +1315,206 @@ export function getProjectsAsync() {
 }
 
 export function getTasksAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(startTasksFetch());
 
         // Get Tasks from Firestore.
-        getFirestore().collection(TASKS).orderBy("project").onSnapshot(includeMetadataChanges, snapshot => {
-            // Handle Metadata.
-            dispatch(setTasksHavePendingWrites(snapshot.metadata.hasPendingWrites))
-
-            // Handle Tasks.
-            if (snapshot.docChanges().length > 0) {
-                var tasks = [];
-                snapshot.forEach(doc => {
-                    tasks.push(doc.data());
-                });
-
-                dispatch(receiveTasks(tasks));
-            }
+        var tasksRef = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS);
+        tasksRef.orderBy("project").onSnapshot(includeMetadataChanges, snapshot => {
+            handleTasksSnapshot(getState, dispatch, false, snapshot);
         }, error => {
             handleFirebaseSnapshotError(error, getState(), dispatch);
         })
     }
 }
 
+function handleTasksSnapshot(getState, dispatch, isRemote, snapshot, remoteProjectId) {
+    // Handle Metadata.
+    dispatch(setTasksHavePendingWrites(snapshot.metadata.hasPendingWrites))
+
+    // Handle Tasks.
+    if (snapshot.docChanges().length > 0) {
+        var tasks = [];
+        snapshot.forEach(doc => {
+            tasks.push(doc.data());
+        });
+
+        if (isRemote) {
+            var filteredTasks = getState().tasks.filter(item => {
+                return item.project !== remoteProjectId;
+            })
+
+            tasks = [...tasks, ...filteredTasks];            
+        }
+
+        dispatch(receiveTasks(tasks));
+        
+    }
+}
+
 export function getTaskListsAsync(projectId) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(startTaskListsFetch());
 
         // Get Tasklists from Firestore.
-        getFirestore().collection(TASKLISTS).onSnapshot(includeMetadataChanges, snapshot => {
-            // Handle Metadata.
-            dispatch(setTaskListsHavePendingWrites(snapshot.metadata.hasPendingWrites));
-
-            if (snapshot.docChanges().length > 0) {
-                var taskLists = [];
-                snapshot.forEach(doc => {
-                    taskLists.push(doc.data());
-                })
-
-                dispatch(receiveTaskLists(taskLists));
-            }
+        getFirestore().collection(USERS).doc(getUserUid()).collection(TASKLISTS).onSnapshot(includeMetadataChanges, snapshot => {
+            handleTaskListsSnapshot(dispatch, false, snapshot, projectId)
         }, error => {
             handleFirebaseSnapshotError(error, getState(), dispatch);
         });
+    }
+}
+
+function handleTaskListsSnapshot(dispatch, isRemote, snapshot, remoteProjectId) {
+    // Handle Metadata.
+    dispatch(setTaskListsHavePendingWrites(snapshot.metadata.hasPendingWrites));
+
+    if (snapshot.docChanges().length > 0) {
+        var taskLists = [];
+        snapshot.forEach(doc => {
+            taskLists.push(doc.data());
+        })
+
+        if (isRemote) {
+            if (isRemote) {
+                var filteredTaskLists = getState().taskLists.filter(item => {
+                    return item.project !== remoteProjectId;
+                })
+    
+                taskLists = [...taskLists, ...filteredTaskLists];            
+            }
+        }
+
+        dispatch(receiveTaskLists(taskLists));
     }
 }
 
 export function getProjectLayoutsAsync(projectId) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(startProjectLayoutsFetch());
 
-        getFirestore().collection(PROJECTLAYOUTS).where("project", "==", projectId).onSnapshot(includeMetadataChanges, snapshot => {
-            // Handle Metadata.
-            dispatch(setProjectLayoutsHavePendingWrites(snapshot.metadata.hasPendingWrites));
-
-            if (snapshot.docChanges().length > 0) {
-                var projectLayouts = [];
-                if (snapshot.empty !== true) {
-                    snapshot.forEach(doc => {
-                        projectLayouts.push(doc.data());
-                    })
-                }
-
-                else {
-                    projectLayouts[0] = new ProjectLayoutStore({}, -1, -1);
-                }
-
-                dispatch(receiveProjectLayout(projectLayouts[0]));
-            }
+        var projectLayoutsRef = getProjectLayoutRef(getFirestore, getState, projectId);
+        projectLayoutsRef.where("project", "==", projectId).onSnapshot(includeMetadataChanges, snapshot => {
+            handleProjectLayoutsSnapshot(dispatch, false, snapshot)
         }, error => {
             handleFirebaseSnapshotError(error, getState(), dispatch);
         });
     }
 }
 
+function handleProjectLayoutsSnapshot(dispatch, isRemote, snapshot) {
+    // Handle Metadata.
+    dispatch(setProjectLayoutsHavePendingWrites(snapshot.metadata.hasPendingWrites));
+
+    if (snapshot.docChanges().length > 0) {
+        var projectLayouts = [];
+        if (snapshot.empty !== true) {
+            snapshot.forEach(doc => {
+                projectLayouts.push(doc.data());
+            })
+        }
+
+        else {
+            projectLayouts[0] = new ProjectLayoutStore({}, -1, -1);
+        }
+
+        if (isRemote) {
+
+        }
+
+        else {
+            dispatch(receiveProjectLayout(projectLayouts[0]));
+        }
+        
+    }
+}
+
 export function unsubscribeAccountConfigAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
-        var accountConfigUnsubscribe = getFirestore().collection(ACCOUNT).doc(ACCOUNT_DOC_ID).onSnapshot(() => { });
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        var accountConfigUnsubscribe = getFirestore().collection(USERS).doc(getUserUid()).collection(ACCOUNT).doc(ACCOUNT_DOC_ID).onSnapshot(() => { });
         accountConfigUnsubscribe();
     }
 }
 
 export function unsubscribeProjectsAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
-        var projectUnsubscribe = getFirestore().collection(PROJECTS).onSnapshot(() => { });
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        var projectUnsubscribe = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).onSnapshot(() => { });
         projectUnsubscribe();
     }
 }
 
 export function unsubscribeTaskListsAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
-        var taskListsUnsubscribe = getFirestore().collection(TASKLISTS).onSnapshot(() => { });
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        var taskListsUnsubscribe = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKLISTS).onSnapshot(() => { });
         taskListsUnsubscribe();
     }
 }
 
 export function unsubscribeTasksAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
-        var tasksUnsubscribe = getFirestore().collection(TASKS).onSnapshot(() => { });
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        var tasksUnsubscribe = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).onSnapshot(() => { });
         tasksUnsubscribe();
     }
 }
 
-export function unsubscribeProjectLayoutsAsync() {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie }) => {
-        if (getState().selectedProjectId !== -1) {
-            var projectLayoutsUnsubscribe = getFirestore().collection(PROJECTLAYOUTS).doc(getState().selectedProjectId).onSnapshot(() => { });
+export function unsubscribeProjectLayoutsAsync(projectId) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        if (projectId !== -1) {
+            var projectLayoutRef = getProjectLayoutRef(getFirestore, getState, projectId);
+
+            var projectLayoutsUnsubscribe = projectLayoutRef.onSnapshot(() => { });
             projectLayoutsUnsubscribe();
         }
     }
 }
 
 // Helper Functions.
+function getProjectRef(getFirestore, getState, projectId) {
+    if (isProjectRemote(getState, projectId)) {
+        return getFirestore().collection(REMOTES).doc(projectId);
+    }
+
+    else {
+        return getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).doc(projectId);
+    }
+}
+
+function getProjectLayoutRef(getFirestore, getState, projectLayoutId) {
+    if (isProjectRemote(getState, getState().selectedProjectId)) {
+        return getFirestore().collection(REMOTES).doc(projectId).collection(PROJECTLAYOUTS);
+    }
+
+    else {
+        return getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTLAYOUTS);
+    }
+}
+
+function getTaskRef(getFirestore, getState, taskId) {
+    var selectedProjectId = getState().selectedProjectId;
+    if (isProjectRemote(getState, selectedProjectId)) {
+        return getFirestore().collection(REMOTES).doc(selectedProjectId).collection(TASKS).doc(taskId);
+    }
+
+    else {
+        return getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).doc(taskId);
+    }
+}
+
+function getTaskListRef(getFirestore, getState, taskListId) {
+    var selectedProjectId = getState().selectedProjectId;
+    if (isProjectRemote(getState, selectedProjectId)) {
+        return getFirestore().collection(REMOTES).doc(selectedProjectId).collection(TASKLISTS).doc(taskListId);
+    }
+
+    else {
+        return getFirestore().collection(USERS).doc(getUserUid()).collection(TASKLISTS).doc(taskListId);
+    }
+}
+
+function isProjectRemote(getState, projectId) {
+    return !getState().remoteProjectIds.find(item => item === projectId) === undefined 
+}
+
 function handleFirebaseSnapshotError(error, state, dispatch) {
     switch (error.code) {
         case "permission-denied":

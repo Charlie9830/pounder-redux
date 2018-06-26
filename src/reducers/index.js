@@ -5,6 +5,11 @@ import { AccountConfigFallback } from 'pounder-firebase';
 
 export function appReducer(state, action) {
     switch (action.type) {
+        case ActionTypes.RECEIVE_REMOTE_PROJECTS:
+            return {
+                ...state,
+                remoteProjects: action.value,
+            }
         case ActionTypes.CHANGE_FOCUSED_TASKLIST:
             return { 
                 ...state,
@@ -44,6 +49,12 @@ export function appReducer(state, action) {
             return {
                 ...state,
                 selectedTask: { taskListWidgetId: action.taskListWidgetId, taskId: action.taskId, isInputOpen: false }
+            }
+        
+        case ActionTypes.SET_IS_SIDEBAR_OPEN:
+            return {
+                ...state,
+                isSidebarOpen: action.value,
             }
 
         case ActionTypes.START_TASK_MOVE:
@@ -155,7 +166,7 @@ export function appReducer(state, action) {
             return {
                 ...state,
                 isAwaitingFirebase: false,
-                taskLists: action.taskLists
+                taskLists: action.taskLists,
             }
         
         case ActionTypes.START_PROJECTLAYOUTS_FETCH:
@@ -169,6 +180,13 @@ export function appReducer(state, action) {
                 ...state,
                 isAwaitingFirebase: false,
                 projectLayout: action.projectLayout
+            }
+
+        case ActionTypes.RECEIVE_REMOTE_PROJECT_LAYOUT:
+            return {
+                ...state,
+                isAwaitingFirebase: false,
+                remoteProjectLayout: action.projectLayout
             }
         
         case ActionTypes.SELECT_PROJECT:
@@ -370,6 +388,41 @@ export function appReducer(state, action) {
                 tasks: [],
                 projectLayout: new ProjectLayoutStore({}, -1, -1),
                 accountConfig: AccountConfigFallback
+            }
+        }
+
+        case ActionTypes.SET_IS_SHARE_MENU_OPEN: {
+            return {
+                ...state,
+                isShareMenuOpen: action.value,
+            }
+        }
+
+        case ActionTypes.SET_IS_INVITING_USER: {
+            return {
+                ...state,
+                isInvitingUser: action.value,
+            }
+        }
+
+        case ActionTypes.SET_INVITE_USER_MESSAGE: {
+            return {
+                ...state,
+                inviteUserMessage: action.value,
+            }
+        }
+
+        case ActionTypes.SET_DISPLAY_NAME: {
+            return {
+                ...state,
+                displayName: action.value,
+            }
+        }
+
+        case ActionTypes.RECEIVE_REMOTE_PROJECT_IDS: {
+            return {
+                ...state,
+                remoteProjectIds: action.value,
             }
         }
 
