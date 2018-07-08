@@ -27,13 +27,24 @@ export function setupBackend(mode, platform) {
 
 var initialState = {
     projects: [],
+    members: [],
+    invites: [],
+    localProjects: [],
+    remoteProjects: [],
     remoteProjectIds: [],
     taskLists: [],
+    localTaskLists: [],
+    remoteTaskLists: [],
     tasks: [],
+    localTasks: [],
+    remoteTasks: [],
     focusedTaskListId: -1,
-    projectLayout: new ProjectLayoutStore({}, -1, -1),
-    selectedTask: {taskListWidgetId: -1, taskId: -1, isInputOpen: false},
+    projectLayouts: [],
+    localProjectLayouts: [],
+    remoteProjectLayouts: [],
+    selectedTask: {taskListWidgetId: -1, taskId: -1, isInputOpen: false, isMetadataOpen: false},
     selectedProjectId: -1,
+    isSelectedProjectRemote: false,
     isATaskMoving: false,
     movingTaskId: -1,
     sourceTaskListId: -1,
@@ -66,20 +77,23 @@ var initialState = {
     isLoggingIn: false,
     isLoggedIn: false,
     userEmail: "",
-    displayName: "ConeBone69",
+    displayName: "",
     isSnackbarOpen: false,
     snackbarMessage: "",
     isSnackbarSelfDismissing: false,
     isSidebarOpen: true,
     isShareMenuOpen: false,
-    isInvitingUser: false,
-    inviteUserMessage: "",
+    isShareMenuWaiting: false,
+    shareMenuMessage: "",
+    shareMenuSubMessage: "",
+    updatingUserId: -1,
+    updatingInviteIds: {},
 }
 
 export var appStore = createStore(
     appReducer,
     initialState,
-    applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth, getDexie, getFunctions } ),  /* Logger */ )
+    applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth, getDexie, getFunctions } ),  /*Logger*/  )
 );
 
 // Types.

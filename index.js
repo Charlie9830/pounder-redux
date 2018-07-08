@@ -50,13 +50,24 @@ var includeMetadataChanges = exports.includeMetadataChanges = { includeMetadataC
 
 var initialState = (_initialState = {
     projects: [],
+    members: [],
+    invites: [],
+    localProjects: [],
+    remoteProjects: [],
     remoteProjectIds: [],
     taskLists: [],
+    localTaskLists: [],
+    remoteTaskLists: [],
     tasks: [],
+    localTasks: [],
+    remoteTasks: [],
     focusedTaskListId: -1,
-    projectLayout: new _pounderStores.ProjectLayoutStore({}, -1, -1),
-    selectedTask: { taskListWidgetId: -1, taskId: -1, isInputOpen: false },
+    projectLayouts: [],
+    localProjectLayouts: [],
+    remoteProjectLayouts: [],
+    selectedTask: { taskListWidgetId: -1, taskId: -1, isInputOpen: false, isMetadataOpen: false },
     selectedProjectId: -1,
+    isSelectedProjectRemote: false,
     isATaskMoving: false,
     movingTaskId: -1,
     sourceTaskListId: -1,
@@ -66,9 +77,9 @@ var initialState = (_initialState = {
     projectSelectorDueDateDisplays: [],
     isLockScreenDisplayed: false,
     lastBackupMessage: ""
-}, _defineProperty(_initialState, 'openTaskListSettingsMenuId', -1), _defineProperty(_initialState, 'projectsHavePendingWrites', false), _defineProperty(_initialState, 'projectLayoutsHavePendingWrites', false), _defineProperty(_initialState, 'taskListsHavePendingWrites', false), _defineProperty(_initialState, 'tasksHavePendingWrites', false), _defineProperty(_initialState, 'isTaskListJumpMenuOpen', false), _defineProperty(_initialState, 'isShuttingDown', false), _defineProperty(_initialState, 'isStartingUp', true), _defineProperty(_initialState, 'appSettingsMenuPage', "general"), _defineProperty(_initialState, 'databaseInfo', ""), _defineProperty(_initialState, 'isDatabasePurging', false), _defineProperty(_initialState, 'isDatabaseRestoring', false), _defineProperty(_initialState, 'generalConfig', _pounderDexie.generalConfigFallback), _defineProperty(_initialState, 'isDexieConfigLoadComplete', false), _defineProperty(_initialState, 'isAppSettingsOpen', false), _defineProperty(_initialState, 'accountConfig', _pounderFirebase.AccountConfigFallback), _defineProperty(_initialState, 'ignoreFullscreenTrigger', false), _defineProperty(_initialState, 'cssConfig', _pounderStores.CssConfigStore), _defineProperty(_initialState, 'messageBox', {}), _defineProperty(_initialState, 'authStatusMessage', ""), _defineProperty(_initialState, 'isLoggingIn', false), _defineProperty(_initialState, 'isLoggedIn', false), _defineProperty(_initialState, 'userEmail', ""), _defineProperty(_initialState, 'displayName', "ConeBone69"), _defineProperty(_initialState, 'isSnackbarOpen', false), _defineProperty(_initialState, 'snackbarMessage', ""), _defineProperty(_initialState, 'isSnackbarSelfDismissing', false), _defineProperty(_initialState, 'isSidebarOpen', true), _defineProperty(_initialState, 'isShareMenuOpen', false), _defineProperty(_initialState, 'isInvitingUser', false), _defineProperty(_initialState, 'inviteUserMessage', ""), _initialState);
+}, _defineProperty(_initialState, 'openTaskListSettingsMenuId', -1), _defineProperty(_initialState, 'projectsHavePendingWrites', false), _defineProperty(_initialState, 'projectLayoutsHavePendingWrites', false), _defineProperty(_initialState, 'taskListsHavePendingWrites', false), _defineProperty(_initialState, 'tasksHavePendingWrites', false), _defineProperty(_initialState, 'isTaskListJumpMenuOpen', false), _defineProperty(_initialState, 'isShuttingDown', false), _defineProperty(_initialState, 'isStartingUp', true), _defineProperty(_initialState, 'appSettingsMenuPage', "general"), _defineProperty(_initialState, 'databaseInfo', ""), _defineProperty(_initialState, 'isDatabasePurging', false), _defineProperty(_initialState, 'isDatabaseRestoring', false), _defineProperty(_initialState, 'generalConfig', _pounderDexie.generalConfigFallback), _defineProperty(_initialState, 'isDexieConfigLoadComplete', false), _defineProperty(_initialState, 'isAppSettingsOpen', false), _defineProperty(_initialState, 'accountConfig', _pounderFirebase.AccountConfigFallback), _defineProperty(_initialState, 'ignoreFullscreenTrigger', false), _defineProperty(_initialState, 'cssConfig', _pounderStores.CssConfigStore), _defineProperty(_initialState, 'messageBox', {}), _defineProperty(_initialState, 'authStatusMessage', ""), _defineProperty(_initialState, 'isLoggingIn', false), _defineProperty(_initialState, 'isLoggedIn', false), _defineProperty(_initialState, 'userEmail', ""), _defineProperty(_initialState, 'displayName', ""), _defineProperty(_initialState, 'isSnackbarOpen', false), _defineProperty(_initialState, 'snackbarMessage', ""), _defineProperty(_initialState, 'isSnackbarSelfDismissing', false), _defineProperty(_initialState, 'isSidebarOpen', true), _defineProperty(_initialState, 'isShareMenuOpen', false), _defineProperty(_initialState, 'isShareMenuWaiting', false), _defineProperty(_initialState, 'shareMenuMessage', ""), _defineProperty(_initialState, 'shareMenuSubMessage', ""), _defineProperty(_initialState, 'updatingUserId', -1), _defineProperty(_initialState, 'updatingInviteIds', {}), _initialState);
 
-var appStore = exports.appStore = (0, _redux.createStore)(_index.appReducer, initialState, (0, _redux.applyMiddleware)(_reduxThunk2.default.withExtraArgument({ getFirestore: _pounderFirebase.getFirestore, getAuth: _pounderFirebase.getAuth, getDexie: _pounderDexie.getDexie, getFunctions: _pounderFirebase.getFunctions }) /* Logger */));
+var appStore = exports.appStore = (0, _redux.createStore)(_index.appReducer, initialState, (0, _redux.applyMiddleware)(_reduxThunk2.default.withExtraArgument({ getFirestore: _pounderFirebase.getFirestore, getAuth: _pounderFirebase.getAuth, getDexie: _pounderDexie.getDexie, getFunctions: _pounderFirebase.getFunctions }) /*Logger*/));
 
 // Types.
 var MessageBoxTypes = exports.MessageBoxTypes = {

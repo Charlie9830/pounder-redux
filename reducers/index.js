@@ -20,12 +20,10 @@ var _pounderFirebase = require('pounder-firebase');
 
 function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
 
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
 function appReducer(state, action) {
     switch (action.type) {
-        case ActionTypes.RECEIVE_REMOTE_PROJECTS:
-            return _extends({}, state, {
-                remoteProjects: action.value
-            });
         case ActionTypes.CHANGE_FOCUSED_TASKLIST:
             return _extends({}, state, {
                 focusedTaskListId: action.id,
@@ -38,7 +36,12 @@ function appReducer(state, action) {
             var openCalendarId = state.openCalendarId === action.taskId ? action.taskId : -1; // Keep calender open if Open already.
 
             return _extends({}, state, {
-                selectedTask: { taskListWidgetId: action.taskListWidgetId, taskId: action.taskId, isInputOpen: false },
+                selectedTask: {
+                    taskListWidgetId: action.taskListWidgetId,
+                    taskId: action.taskId,
+                    isInputOpen: false,
+                    isMetadataOpen: action.openMetadata
+                },
                 focusedTaskListId: action.taskListWidgetId,
                 isATaskMoving: false,
                 movingTaskId: -1,
@@ -50,7 +53,12 @@ function appReducer(state, action) {
 
         case ActionTypes.OPEN_TASK:
             return _extends({}, state, {
-                selectedTask: { taskListWidgetId: action.taskListWidgetId, taskId: action.taskId, isInputOpen: true },
+                selectedTask: {
+                    taskListWidgetId: action.taskListWidgetId,
+                    taskId: action.taskId,
+                    isInputOpen: true,
+                    isMetadataOpen: false
+                },
                 isATaskMoving: false,
                 movingTaskId: -1,
                 sourceTaskListId: -1,
@@ -60,8 +68,20 @@ function appReducer(state, action) {
 
         case ActionTypes.CLOSE_TASK:
             return _extends({}, state, {
-                selectedTask: { taskListWidgetId: action.taskListWidgetId, taskId: action.taskId, isInputOpen: false }
+                selectedTask: {
+                    taskListWidgetId: action.taskListWidgetId,
+                    taskId: action.taskId,
+                    isInputOpen: false,
+                    isMetadataOpen: false
+                }
             });
+
+        case ActionTypes.CLOSE_METADATA:
+            {
+                return _extends({}, state, {
+                    selectedTask: _extends({}, state.selectedTask, { isMetadataOpen: false })
+                });
+            }
 
         case ActionTypes.SET_IS_SIDEBAR_OPEN:
             return _extends({}, state, {
@@ -71,7 +91,12 @@ function appReducer(state, action) {
         case ActionTypes.START_TASK_MOVE:
             return _extends({}, state, {
                 isATaskMoving: true,
-                selectedTask: { taskListWidgetId: action.sourceTaskListWidgetId, taskId: action.taskId, isInputOpen: false },
+                selectedTask: {
+                    taskListWidgetId: action.sourceTaskListWidgetId,
+                    taskId: action.taskId,
+                    isInputOpen: false,
+                    isMetadataOpen: false
+                },
                 focusedTaskListId: action.sourceTaskListWidgetId,
                 movingTaskId: action.movingTaskId,
                 sourceTaskListId: action.sourceTaskListWidgetId,
@@ -90,17 +115,46 @@ function appReducer(state, action) {
                 isATaskMoving: false,
                 sourceTaskListId: -1,
                 movingTaskId: -1,
-                selectedTask: { taskListWidgetId: action.destinationTaskListWidgetId, taskId: action.movedTaskId, isInputOpen: false }
+                selectedTask: {
+                    taskListWidgetId: action.destinationTaskListWidgetId,
+                    taskId: action.movedTaskId,
+                    isInputOpen: false,
+                    isMetadataOpen: false
+                }
             });
         case ActionTypes.START_PROJECTS_FETCH:
             return _extends({}, state, {
                 isAwaitingFirebase: true
             });
 
-        case ActionTypes.RECEIVE_PROJECTS:
+        case ActionTypes.RECEIVE_LOCAL_PROJECTS:
             return _extends({}, state, {
-                projects: action.projects,
+                localProjects: action.projects,
+                projects: [].concat(_toConsumableArray(action.projects), _toConsumableArray(state.remoteProjects)),
                 isAwaitingFirebase: false
+            });
+
+        case ActionTypes.RECEIVE_REMOTE_PROJECTS:
+            return _extends({}, state, {
+                remoteProjects: action.projects,
+                projects: [].concat(_toConsumableArray(state.localProjects), _toConsumableArray(action.projects))
+            });
+
+        case ActionTypes.SET_UPDATING_USER_ID:
+            {
+                return _extends({}, state, {
+                    updatingUserId: action.value
+                });
+            }
+
+        case ActionTypes.RECEIVE_MEMBERS:
+            return _extends({}, state, {
+                members: action.members
+            });
+
+        case ActionTypes.RECEIVE_INVITES:
+            return _extends({}, state, {
+                invites: action.invites
             });
 
         case ActionTypes.START_TASKS_FETCH:
@@ -108,11 +162,22 @@ function appReducer(state, action) {
                 isAwaitingFirebase: true
             });
 
-        case ActionTypes.RECEIVE_TASKS:
+        case ActionTypes.RECEIVE_LOCAL_TASKS:
+            var newTasks = [].concat(_toConsumableArray(action.tasks), _toConsumableArray(state.remoteTasks));
             return _extends({}, state, {
                 isAwaitingFirebase: false,
-                tasks: action.tasks,
-                projectSelectorDueDateDisplays: getProjectSelectorDueDateDisplaysHelper(action.tasks)
+                tasks: newTasks,
+                localTasks: action.tasks,
+                projectSelectorDueDateDisplays: getProjectSelectorDueDateDisplaysHelper(newTasks)
+            });
+
+        case ActionTypes.RECEIVE_REMOTE_TASKS:
+            var newTasks = [].concat(_toConsumableArray(state.localTasks), _toConsumableArray(action.tasks));
+            return _extends({}, state, {
+                isAwaitingFirebase: false,
+                tasks: newTasks,
+                remoteTasks: action.tasks,
+                projectSelectorDueDateDisplays: getProjectSelectorDueDateDisplaysHelper(newTasks)
             });
 
         case ActionTypes.LOCK_APP:
@@ -133,7 +198,12 @@ function appReducer(state, action) {
 
         case ActionTypes.OPEN_CALENDAR:
             return _extends({}, state, {
-                selectedTask: { taskListWidgetId: action.taskListWidgetId, taskId: action.taskId, isInputOpen: false },
+                selectedTask: {
+                    taskListWidgetId: action.taskListWidgetId,
+                    taskId: action.taskId,
+                    isInputOpen: false,
+                    isMetadataOpen: false
+                },
                 openCalendarId: action.taskId
             });
 
@@ -157,10 +227,18 @@ function appReducer(state, action) {
                 isAwaitingFirebase: true
             });
 
-        case ActionTypes.RECEIVE_TASKLISTS:
+        case ActionTypes.RECEIVE_LOCAL_TASKLISTS:
             return _extends({}, state, {
                 isAwaitingFirebase: false,
-                taskLists: action.taskLists
+                taskLists: [].concat(_toConsumableArray(action.taskLists), _toConsumableArray(state.remoteTaskLists)),
+                localTaskLists: action.taskLists
+            });
+
+        case ActionTypes.RECEIVE_REMOTE_TASKLISTS:
+            return _extends({}, state, {
+                isAwatingFirebase: false,
+                taskLists: [].concat(_toConsumableArray(state.localTaskLists), _toConsumableArray(action.taskLists)),
+                remoteTaskLists: action.taskLists
             });
 
         case ActionTypes.START_PROJECTLAYOUTS_FETCH:
@@ -168,10 +246,18 @@ function appReducer(state, action) {
                 isAwaitingFirebase: true
             });
 
-        case ActionTypes.RECEIVE_PROJECTLAYOUT:
+        case ActionTypes.RECEIVE_LOCAL_PROJECTLAYOUTS:
             return _extends({}, state, {
                 isAwaitingFirebase: false,
-                projectLayout: action.projectLayout
+                localProjectLayouts: action.value,
+                projectLayouts: [].concat(_toConsumableArray(action.value), _toConsumableArray(state.remoteProjectLayouts))
+            });
+
+        case ActionTypes.RECEIVE_REMOTE_PROJECTLAYOUTS:
+            return _extends({}, state, {
+                isAwaitingFirebase: false,
+                remoteProjectLayouts: action.value,
+                projectLayouts: [].concat(_toConsumableArray(state.localProjectLayouts), _toConsumableArray(action.value))
             });
 
         case ActionTypes.RECEIVE_REMOTE_PROJECT_LAYOUT:
@@ -183,8 +269,14 @@ function appReducer(state, action) {
         case ActionTypes.SELECT_PROJECT:
             return _extends({}, state, {
                 selectedProjectId: action.projectId,
+                isSelectedProjectRemote: action.projectId === -1 ? false : isProjectRemote(state, action.projectId),
                 openCalendarId: -1,
-                selectedTask: { taskListWidgetId: -1, taskId: -1, isInputOpen: false },
+                selectedTask: {
+                    taskListWidgetId: -1,
+                    taskId: -1,
+                    isInputOpen: false,
+                    isMetadataOpen: false
+                },
                 isATaskMoving: false,
                 movingTaskId: -1,
                 sourceTaskListId: -1,
@@ -358,35 +450,66 @@ function appReducer(state, action) {
                 });
             }
 
+        case ActionTypes.SET_OPEN_METADATA_ID:
+            {
+                return _extends({}, state, {
+                    openMetadataId: action.value
+                });
+            }
+
         case ActionTypes.CLEAR_DATA:
             {
                 return _extends({}, state, {
                     projects: [],
+                    members: [],
+                    invites: [],
+                    localProjects: [],
+                    remoteProjects: [],
+                    remoteProjectIds: [],
                     taskLists: [],
+                    localTaskLists: [],
+                    remoteTaskLists: [],
                     tasks: [],
-                    projectLayout: new _pounderStores.ProjectLayoutStore({}, -1, -1),
+                    localTasks: [],
+                    remoteTasks: [],
+                    projectLayouts: [],
+                    localProjectLayouts: [],
+                    remoteProjectLayouts: [],
                     accountConfig: _pounderFirebase.AccountConfigFallback
                 });
             }
 
+        case ActionTypes.SET_UPDATING_INVITE_IDS:
+            return _extends({}, state, {
+                updatingInviteIds: action.value
+            });
+
         case ActionTypes.SET_IS_SHARE_MENU_OPEN:
             {
                 return _extends({}, state, {
-                    isShareMenuOpen: action.value
+                    isShareMenuOpen: action.value,
+                    userInviteMessage: action.value === false ? '' : state.userInviteMessage
                 });
             }
 
-        case ActionTypes.SET_IS_INVITING_USER:
+        case ActionTypes.SET_IS_SHARE_MENU_WAITING:
             {
                 return _extends({}, state, {
-                    isInvitingUser: action.value
+                    isShareMenuWaiting: action.value
                 });
             }
 
-        case ActionTypes.SET_INVITE_USER_MESSAGE:
+        case ActionTypes.SET_SHARE_MENU_MESSAGE:
             {
                 return _extends({}, state, {
-                    inviteUserMessage: action.value
+                    shareMenuMessage: action.value
+                });
+            }
+
+        case ActionTypes.SET_SHARE_MENU_SUB_MESSAGE:
+            {
+                return _extends({}, state, {
+                    shareMenuSubMessage: action.value
                 });
             }
 
@@ -411,6 +534,13 @@ function appReducer(state, action) {
 }
 
 // Helper Methods.
+function isProjectRemote(state, projectId) {
+    var index = state.remoteProjectIds.findIndex(function (id) {
+        return id === projectId;
+    });
+    return index !== -1;
+}
+
 var getProjectSelectorDueDateDisplaysHelper = function getProjectSelectorDueDateDisplaysHelper(tasks) {
     var returnList = {};
 

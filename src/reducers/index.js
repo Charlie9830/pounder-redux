@@ -5,11 +5,6 @@ import { AccountConfigFallback } from 'pounder-firebase';
 
 export function appReducer(state, action) {
     switch (action.type) {
-        case ActionTypes.RECEIVE_REMOTE_PROJECTS:
-            return {
-                ...state,
-                remoteProjects: action.value,
-            }
         case ActionTypes.CHANGE_FOCUSED_TASKLIST:
             return { 
                 ...state,
@@ -24,7 +19,12 @@ export function appReducer(state, action) {
 
             return {
                 ...state,
-                selectedTask: { taskListWidgetId: action.taskListWidgetId, taskId: action.taskId, isInputOpen: false },
+                selectedTask: {
+                    taskListWidgetId: action.taskListWidgetId,
+                    taskId: action.taskId,
+                    isInputOpen: false,
+                    isMetadataOpen: action.openMetadata
+                },
                 focusedTaskListId: action.taskListWidgetId,
                 isATaskMoving: false,
                 movingTaskId: -1,
@@ -37,7 +37,12 @@ export function appReducer(state, action) {
         case ActionTypes.OPEN_TASK:
             return {
                 ...state,
-                selectedTask: { taskListWidgetId: action.taskListWidgetId, taskId: action.taskId, isInputOpen: true },
+                selectedTask: {
+                    taskListWidgetId: action.taskListWidgetId,
+                    taskId: action.taskId,
+                    isInputOpen: true,
+                    isMetadataOpen: false
+                },
                 isATaskMoving: false,
                 movingTaskId: -1,
                 sourceTaskListId: -1,
@@ -48,9 +53,21 @@ export function appReducer(state, action) {
         case ActionTypes.CLOSE_TASK:
             return {
                 ...state,
-                selectedTask: { taskListWidgetId: action.taskListWidgetId, taskId: action.taskId, isInputOpen: false }
+                selectedTask: {
+                    taskListWidgetId: action.taskListWidgetId,
+                    taskId: action.taskId,
+                    isInputOpen: false,
+                    isMetadataOpen: false
+                }
             }
         
+        case ActionTypes.CLOSE_METADATA: {
+            return {
+                ...state,
+                selectedTask: {...state.selectedTask, isMetadataOpen: false },
+            }
+        }
+
         case ActionTypes.SET_IS_SIDEBAR_OPEN:
             return {
                 ...state,
@@ -61,7 +78,12 @@ export function appReducer(state, action) {
             return {
                 ...state,
                 isATaskMoving: true,
-                selectedTask: { taskListWidgetId: action.sourceTaskListWidgetId, taskId: action.taskId, isInputOpen: false },
+                selectedTask: {
+                    taskListWidgetId: action.sourceTaskListWidgetId,
+                    taskId: action.taskId,
+                    isInputOpen: false,
+                    isMetadataOpen: false
+                },
                 focusedTaskListId: action.sourceTaskListWidgetId,
                 movingTaskId: action.movingTaskId,
                 sourceTaskListId: action.sourceTaskListWidgetId,
@@ -82,7 +104,12 @@ export function appReducer(state, action) {
                 isATaskMoving: false,
                 sourceTaskListId: -1,
                 movingTaskId: -1,
-                selectedTask: { taskListWidgetId: action.destinationTaskListWidgetId, taskId: action.movedTaskId, isInputOpen: false }
+                selectedTask: {
+                    taskListWidgetId: action.destinationTaskListWidgetId,
+                    taskId: action.movedTaskId,
+                    isInputOpen: false,
+                    isMetadataOpen: false
+                }
             }
         case ActionTypes.START_PROJECTS_FETCH:
             return {
@@ -90,11 +117,38 @@ export function appReducer(state, action) {
                 isAwaitingFirebase: true
             }
         
-        case ActionTypes.RECEIVE_PROJECTS:
+        case ActionTypes.RECEIVE_LOCAL_PROJECTS:
             return {
                 ...state,
-                projects: action.projects,
+                localProjects: action.projects,
+                projects: [...action.projects, ...state.remoteProjects],
                 isAwaitingFirebase: false,
+            }
+
+        case ActionTypes.RECEIVE_REMOTE_PROJECTS:
+            return {
+                ...state,
+                remoteProjects: action.projects,
+                projects: [...state.localProjects, ...action.projects]
+            }
+            
+        case ActionTypes.SET_UPDATING_USER_ID: {
+            return {
+                ...state,
+                updatingUserId: action.value,
+            }
+        }
+
+        case ActionTypes.RECEIVE_MEMBERS: 
+            return {
+                ...state,
+                members: action.members,
+            }
+
+        case ActionTypes.RECEIVE_INVITES: 
+            return {
+                ...state,
+                invites: action.invites,
             }
 
         case ActionTypes.START_TASKS_FETCH:
@@ -103,12 +157,24 @@ export function appReducer(state, action) {
                 isAwaitingFirebase: true
             }
 
-        case ActionTypes.RECEIVE_TASKS:
+        case ActionTypes.RECEIVE_LOCAL_TASKS:
+            var newTasks = [...action.tasks, ...state.remoteTasks];
             return {
                 ...state,
                 isAwaitingFirebase: false,
-                tasks: action.tasks,
-                projectSelectorDueDateDisplays: getProjectSelectorDueDateDisplaysHelper(action.tasks)
+                tasks: newTasks,
+                localTasks: action.tasks,
+                projectSelectorDueDateDisplays: getProjectSelectorDueDateDisplaysHelper(newTasks)
+            }
+        
+        case ActionTypes.RECEIVE_REMOTE_TASKS:
+            var newTasks = [...state.localTasks, ...action.tasks];
+            return {
+                ...state,
+                isAwaitingFirebase: false,
+                tasks: newTasks,
+                remoteTasks: action.tasks,
+                projectSelectorDueDateDisplays: getProjectSelectorDueDateDisplaysHelper(newTasks)
             }
         
         case ActionTypes.LOCK_APP:
@@ -133,7 +199,12 @@ export function appReducer(state, action) {
         case ActionTypes.OPEN_CALENDAR: 
             return {
                 ...state,
-                selectedTask: { taskListWidgetId: action.taskListWidgetId, taskId: action.taskId, isInputOpen: false },
+                selectedTask: {
+                    taskListWidgetId: action.taskListWidgetId,
+                    taskId: action.taskId,
+                    isInputOpen: false,
+                    isMetadataOpen: false,
+                },
                 openCalendarId: action.taskId
             }
 
@@ -162,11 +233,20 @@ export function appReducer(state, action) {
                 isAwaitingFirebase: true
             }
 
-        case ActionTypes.RECEIVE_TASKLISTS:
+        case ActionTypes.RECEIVE_LOCAL_TASKLISTS:
             return {
                 ...state,
                 isAwaitingFirebase: false,
-                taskLists: action.taskLists,
+                taskLists: [...action.taskLists, ...state.remoteTaskLists],
+                localTaskLists: action.taskLists,
+            }
+
+        case ActionTypes.RECEIVE_REMOTE_TASKLISTS:
+            return {
+                ...state,
+                isAwatingFirebase: false,
+                taskLists: [...state.localTaskLists, ...action.taskLists],
+                remoteTaskLists: action.taskLists,
             }
         
         case ActionTypes.START_PROJECTLAYOUTS_FETCH:
@@ -175,11 +255,20 @@ export function appReducer(state, action) {
                 isAwaitingFirebase: true,
             }
 
-        case ActionTypes.RECEIVE_PROJECTLAYOUT:
+        case ActionTypes.RECEIVE_LOCAL_PROJECTLAYOUTS:
             return {
                 ...state,
                 isAwaitingFirebase: false,
-                projectLayout: action.projectLayout
+                localProjectLayouts: action.value,
+                projectLayouts: [...action.value, ...state.remoteProjectLayouts]
+            }
+
+        case ActionTypes.RECEIVE_REMOTE_PROJECTLAYOUTS:
+            return {
+                ...state,
+                isAwaitingFirebase: false,
+                remoteProjectLayouts: action.value,
+                projectLayouts: [...state.localProjectLayouts, ...action.value]
             }
 
         case ActionTypes.RECEIVE_REMOTE_PROJECT_LAYOUT:
@@ -193,8 +282,14 @@ export function appReducer(state, action) {
             return {
                 ...state,
                 selectedProjectId: action.projectId,
+                isSelectedProjectRemote: action.projectId === -1 ? false : isProjectRemote(state, action.projectId),
                 openCalendarId: -1,
-                selectedTask: { taskListWidgetId: -1, taskId: -1, isInputOpen: false },
+                selectedTask: {
+                    taskListWidgetId: -1,
+                    taskId: -1,
+                    isInputOpen: false,
+                    isMetadataOpen: false
+                },
                 isATaskMoving: false,
                 movingTaskId: -1,
                 sourceTaskListId: -1,
@@ -380,35 +475,67 @@ export function appReducer(state, action) {
             }
         }
 
+        case ActionTypes.SET_OPEN_METADATA_ID: {
+            return {
+                ...state,
+                openMetadataId: action.value,
+            }
+        }
+
         case ActionTypes.CLEAR_DATA: {
             return {
                 ...state,
                 projects: [],
+                members: [],
+                invites: [],
+                localProjects: [],
+                remoteProjects: [],
+                remoteProjectIds: [],
                 taskLists: [],
+                localTaskLists: [],
+                remoteTaskLists: [],
                 tasks: [],
-                projectLayout: new ProjectLayoutStore({}, -1, -1),
+                localTasks: [],
+                remoteTasks: [],
+                projectLayouts: [],
+                localProjectLayouts: [],
+                remoteProjectLayouts: [],
                 accountConfig: AccountConfigFallback
             }
+        }
+
+        case ActionTypes.SET_UPDATING_INVITE_IDS:
+        return {
+            ...state,
+            updatingInviteIds: action.value,
         }
 
         case ActionTypes.SET_IS_SHARE_MENU_OPEN: {
             return {
                 ...state,
                 isShareMenuOpen: action.value,
+                userInviteMessage: action.value === false ? '' : state.userInviteMessage,
             }
         }
 
-        case ActionTypes.SET_IS_INVITING_USER: {
+        case ActionTypes.SET_IS_SHARE_MENU_WAITING: {
             return {
                 ...state,
-                isInvitingUser: action.value,
+                isShareMenuWaiting: action.value,
             }
         }
 
-        case ActionTypes.SET_INVITE_USER_MESSAGE: {
+        case ActionTypes.SET_SHARE_MENU_MESSAGE: {
             return {
                 ...state,
-                inviteUserMessage: action.value,
+                shareMenuMessage: action.value,
+            }
+        }
+
+        case ActionTypes.SET_SHARE_MENU_SUB_MESSAGE: {
+            return {
+                ...state,
+                shareMenuSubMessage: action.value,
             }
         }
 
@@ -425,7 +552,7 @@ export function appReducer(state, action) {
                 remoteProjectIds: action.value,
             }
         }
-
+        
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);
             return state;
@@ -433,6 +560,11 @@ export function appReducer(state, action) {
 }
 
 // Helper Methods.
+function isProjectRemote(state, projectId) {
+    var index = state.remoteProjectIds.findIndex(id => { return id === projectId });
+    return index !== -1;
+}
+
 var getProjectSelectorDueDateDisplaysHelper = function(tasks) {
     var returnList = {};
 

@@ -1,8 +1,8 @@
 import * as ActionTypes from '../action-types/index';
 import { setUserUid, getUserUid, USERS, PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS, ACCOUNT, ACCOUNT_DOC_ID,
-     REMOTE_IDS, REMOTES } from 'pounder-firebase';
-import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore, CssConfigStore, 
-InviteStore, RemoteStore} from 'pounder-stores';
+     REMOTE_IDS, REMOTES, MEMBERS, INVITES } from 'pounder-firebase';
+import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore, CssConfigStore, MemberStore,
+InviteStore, RemoteStore, TaskMetadataStore} from 'pounder-stores';
 import Moment from 'moment';
 import { includeMetadataChanges } from '../index';
 import parseArgs from 'minimist';
@@ -10,13 +10,34 @@ import stringArgv from 'string-argv';
 import { getDayPickerDate, getClearedDate, getDaysForwardDate, getWeeksForwardDate, getParsedDate } from 'pounder-utilities';
 
 const legalArgsRegEx = / -dd | -hp /i;
-const dateFormat = "DD-MM-YYYY";
+const DATE_FORMAT = 'dddd MMMM Do YYYY, h:mm a';
 
 // Standard Action Creators.
+export function setUpdatingUserId(userId) {
+    return {
+        type: ActionTypes.SET_UPDATING_USER_ID,
+        value: userId,
+    }
+}
+
+export function receiveMembers(members) {
+    return {
+        type: ActionTypes.RECEIVE_MEMBERS,
+        members: members,
+    }
+}
+
+export function receiveInvites(invites) {
+    return {
+        type: ActionTypes.RECEIVE_INVITES,
+        invites: invites,
+    }
+}
+
 export function receiveRemoteProjects(projects) {
     return {
         type: ActionTypes.RECEIVE_REMOTE_PROJECTS,
-        value: projects,
+        projects: projects,
     }
 }
 
@@ -26,16 +47,24 @@ export function setDisplayName(displayName) {
         value: displayName,
     }
 }
-export function setInviteUserMessage(message) {
+
+export function setShareMenuMessage(message) {
     return {
-        type: ActionTypes.SET_INVITE_USER_MESSAGE,
+        type: ActionTypes.SET_SHARE_MENU_MESSAGE,
         value: message,
     }
 }
 
-export function setIsInvitingUser(value) {
+export function setShareMenuSubMessage(message) {
     return {
-        type: ActionTypes.SET_IS_INVITING_USER,
+        type: ActionTypes.SET_SHARE_MENU_SUB_MESSAGE,
+        value: message,
+    }
+}
+
+export function setIsShareMenuWaiting(value) {
+    return {
+        type: ActionTypes.SET_IS_SHARE_MENU_WAITING,
         value: value,
     }
 }
@@ -55,6 +84,12 @@ export function setIsSidebarOpen(isOpen) {
 export function clearData() {
     return {
         type: ActionTypes.CLEAR_DATA,
+    }
+}
+
+export function closeMetadata() {
+    return {
+        type: ActionTypes.CLOSE_METADATA,
     }
 }
 
@@ -162,7 +197,7 @@ export function setIsStartingUpFlag(isStartingUp) {
 
 export function setIsRestoreDatabaseCompleteDialogOpen(isOpen) {
     return {
-        type: ActionTypes.SET_IS_RESTORE_DATBASE_COMPLETE_DIALOG_OPEN,
+        type: ActionTypes.SET_IS_RESTORE_DATABASE_COMPLETE_DIALOG_OPEN,
         value: isOpen,
     }
 }
@@ -202,11 +237,12 @@ export function changeFocusedTaskList(id) {
     }
 }
 
-export function selectTask(taskListWidgetId, taskId) {
+export function selectTask(taskListWidgetId, taskId, openMetadata) {
     return {
         type: ActionTypes.SELECT_TASK,
         taskListWidgetId: taskListWidgetId,
         taskId: taskId,
+        openMetadata: openMetadata,
     }
 }
 
@@ -246,9 +282,9 @@ export function startProjectsFetch() {
     }
 }
 
-export function receiveProjects(projects) {
+export function receiveLocalProjects(projects) {
     return {
-        type: ActionTypes.RECEIVE_PROJECTS,
+        type: ActionTypes.RECEIVE_LOCAL_PROJECTS,
         projects: projects
     }
 }
@@ -259,9 +295,9 @@ export function startTasksFetch() {
     }
 }
 
-export function receiveTasks(tasks) {
+export function receiveLocalTasks(tasks) {
     return {
-        type: ActionTypes.RECEIVE_TASKS,
+        type: ActionTypes.RECEIVE_LOCAL_TASKS,
         tasks: tasks
     }
 }
@@ -269,7 +305,7 @@ export function receiveTasks(tasks) {
 export function receiveRemoteTasks(tasks) {
     return {
         type: ActionTypes.RECEIVE_REMOTE_TASKS,
-        remoteTasks: tasks
+        tasks: tasks,
     }
 }
 
@@ -299,6 +335,13 @@ export function setOpenTaskListSettingsMenuId(id) {
     }
 }
 
+export function setUpdatingInviteIds(updatingInviteIds) {
+    return {
+        type: ActionTypes.SET_UPDATING_INVITE_IDS,
+        value: updatingInviteIds,
+    }
+}
+
 export function openCalendar(taskListWidgetId, taskId) {
     return {
         type: ActionTypes.OPEN_CALENDAR,
@@ -325,10 +368,17 @@ export function startTaskListsFetch() {
     }
 }
 
-export function receiveTaskLists(taskLists) {
+export function receiveLocalTaskLists(taskLists) {
     return {
-        type: ActionTypes.RECEIVE_TASKLISTS,
+        type: ActionTypes.RECEIVE_LOCAL_TASKLISTS,
         taskLists: taskLists
+    }
+}
+
+export function receiveRemoteTaskLists(taskLists) {
+    return {
+        type: ActionTypes.RECEIVE_REMOTE_TASKLISTS,
+        taskLists: taskLists,
     }
 }
 
@@ -338,17 +388,17 @@ export function startProjectLayoutsFetch() {
     }
 }
 
-export function receiveProjectLayout(projectLayout) {
+export function receiveLocalProjectLayouts(projectLayouts) {
     return {
-        type: ActionTypes.RECEIVE_PROJECTLAYOUT,
-        projectLayout: projectLayout
+        type: ActionTypes.RECEIVE_LOCAL_PROJECTLAYOUTS,
+        value: projectLayouts
     }
 }
 
-export function receiveRemoteProjectLayout(projectLayout) {
+export function receiveRemoteProjectLayouts(projectLayouts) {
     return {
-        type: ActionTypes.RECEIVE_REMOTE_PROJECT_LAYOUT,
-        projectLayout: projectLayout
+        type: ActionTypes.RECEIVE_REMOTE_PROJECTLAYOUTS,
+        value: projectLayouts
     }
 }
 
@@ -431,6 +481,85 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
+export function registerNewUserAsync(email, password, displayName) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(setAuthStatusMessage("Registering..."));
+
+        getAuth().createUserWithEmailAndPassword(email, password).then(() => {
+            // User Created. Update their DisplayName.
+            getAuth().currentUser.updateProfile({ displayName: displayName }).then( () => {
+                // Complete
+                dispatch(setDisplayName(displayName));
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            })
+            
+        }).catch(error => {
+            let message = parseFirebaseError(error);
+            dispatch(postSnackbarMessage(message, true));
+            dispatch(setIsLoggingInFlag(false));
+            dispatch(setAuthStatusMessage(""));
+        })
+    }
+}
+
+export function acceptProjectInviteAsync(projectId) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        addUpdatingInviteId(dispatch, getState, projectId);
+
+        var acceptProjectInvite = getFunctions().httpsCallable('acceptProjectInvite');
+        acceptProjectInvite({projectId: projectId}).then( () => {
+            var inviteRef = getFirestore().collection(USERS).doc(getUserUid()).collection(INVITES).doc(projectId);
+            inviteRef.delete().then( () => {
+                // Success.
+                removeUpdatingInviteId(dispatch, getState, projectId);
+            }).catch(error => {
+                dispatch(handleFirebaseUpdateError(error, getState(), dispatch));
+                removeUpdatingInviteId(dispatch, getState, projectId);
+            })
+
+        }).catch(error => {
+            var message = `An Error occured, are you sure you are connected to the internet? Error Message : ${error.message}`; 
+            dispatch(postSnackbarMessage(message, false));
+            removeUpdatingInviteId(dispatch, getState, projectId);
+        })
+    }
+}
+
+function addUpdatingInviteId(dispatch, getState, projectId) {
+    var inviteIds = getState().updatingInviteIds;
+    inviteIds[projectId] = projectId;
+    dispatch(setUpdatingInviteIds(inviteIds));
+}
+
+function removeUpdatingInviteId(dispatch, getState, projectId) {
+    var inviteIds = getState().updatingInviteIds;
+    if (inviteIds.hasOwnProperty(projectId)) {
+        delete inviteIds[projectId];
+    }
+
+    dispatch(setUpdatingInviteIds(inviteIds));
+}
+
+export function denyProjectInviteAsync(projectId) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        var inviteRef = getFirestore().collection(USERS).doc(getUserUid()).collection(INVITES).doc(projectId);
+
+        inviteRef.delete().then(() => {
+            // Success.
+            var denyProjectInvite = getFunctions().httpsCallable('denyProjectInvite');
+            denyProjectInvite({projectId: projectId}).then( result => {
+                if (result.data.status === 'error') {
+                    dispatch(postSnackbarMessage(result.data.message, false));
+                }
+            })
+        }).catch(error => {
+            dispatch(handleFirebaseUpdateError(error, getState(), dispatch));
+        })
+    }
+}
+
+
 export function getRemoteProjectIdsAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         getFirestore().collection(USERS).doc(getUserUid()).collection(REMOTE_IDS).onSnapshot( snapshot => {
@@ -438,18 +567,18 @@ export function getRemoteProjectIdsAsync() {
                 var remoteProjectIds = []
 
                 snapshot.forEach(doc => {
-                    remoteProjectIds.push(doc.data());
+                    remoteProjectIds.push(doc.data().projectId);
                 })
 
                 dispatch(receiveRemoteProjectIds(remoteProjectIds));
 
                 snapshot.docChanges().forEach(change => {
                     if (change.type === "added") {
-                        dispatch(subscribeToRemoteProjectAsync(change.doc.data()));
+                        dispatch(subscribeToRemoteProjectAsync(change.doc.data().projectId));
                     }
 
                     if (change.type === "removed") {
-                        dispatch(unsubscribeFromRemoteProjectAsync(change.doc.data()));
+                        dispatch(unsubscribeFromRemoteProjectAsync(change.doc.data().projectId));
                     }
                 });
         
@@ -463,34 +592,55 @@ export function getRemoteProjectIdsAsync() {
 export function subscribeToRemoteProjectAsync(projectId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         // Top Level Project Info.
-        getFirestore().collection(REMOTE_PROJECTS).doc(projectId).onSnapshot( doc => {
+        getFirestore().collection(REMOTES).doc(projectId).onSnapshot( doc => {
             if (doc.exists) {
                 var projectName = doc.get('projectName');
                 var members = doc.get('members');
 
-                filteredProjects = getState().projects.filter(item => {
-                    return item.uid !== doc.uid;
+                var filteredProjects = getState().remoteProjects.filter(item => {
+                    return item.uid !== doc.id;
                 })
 
-                filterProjects.push({ projectName: projectName, members: members, uid: doc.uid});
-                dispatch(receiveProjects(filteredProjects));
+                filteredProjects.push({ projectName: projectName, members: members, uid: doc.id, isRemote: true});
+                dispatch(receiveRemoteProjects(filteredProjects));
             }
         })
 
+        // Members.
+        getFirestore().collection(REMOTES).doc(projectId).collection(MEMBERS).onSnapshot(snapshot => {
+            handleMembersSnapshot(getState, dispatch, snapshot, projectId);
+        })
+
         // TaskLists.
-        getFirestore().collection(REMOTE_PROJECTS).doc(projectId).collection(TASKLISTS).onSnapshot(snapshot => {
-            handleTaskListsSnapshot(dispatch, true, snapshot, projectId);
+        getFirestore().collection(REMOTES).doc(projectId).collection(TASKLISTS).onSnapshot(includeMetadataChanges, snapshot => {
+            handleTaskListsSnapshot(getState, dispatch, true, snapshot, projectId);
         })
 
         // Tasks.
-        getFirestore().collection(REMOTE_PROJECTS).doc(projectId).collection(TASKS).orderBy('project').onSnapshot(snapshot => {
-            handleTasksSnapshot(getState, dispatch, true, snapshot, remoteProjectId);
+        getFirestore().collection(REMOTES).doc(projectId).collection(TASKS).orderBy('project').onSnapshot(includeMetadataChanges, snapshot => {
+            handleTasksSnapshot(getState, dispatch, true, snapshot, projectId);
         })
 
         // ProjectLayout.
-        getFirestore().collection(REMOTE_PROJECTS).doc(projectId).collection(PROJECTLAYOUTS).onSnapshot(snapshot => {
-            handleProjectLayoutsSnapshot(dispatch, true, snapshot);
+        getFirestore().collection(REMOTES).doc(projectId).collection(PROJECTLAYOUTS).onSnapshot(includeMetadataChanges, snapshot => {
+            handleProjectLayoutsSnapshot(getState, dispatch, true, snapshot, projectId);
         })
+    }
+}
+
+function handleMembersSnapshot(getState, dispatch, snapshot, projectId) {
+    if (snapshot.docChanges().length > 0) {
+        var currentMembers = getState().members;
+
+        var filteredMembers = currentMembers.filter(item => {
+            return item.project !== projectId;
+        })
+
+        snapshot.forEach(doc => {
+            filteredMembers.push(doc.data());
+        })
+
+        dispatch(receiveMembers(filteredMembers));
     }
 }
 
@@ -499,89 +649,334 @@ export function unsubscribeFromRemoteProjectAsync(projectId) {
         // Project.
         var projectUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).onSnapshot(doc => {})
         projectUnsubscribe();
+
+        var remoteProjects = getState().remoteProjects.filter(item => {
+            return item.uid !== projectId;
+        })
+        dispatch(receiveRemoteProjects(remoteProjects));
         
         // TaskLists.
         var taskListsUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).collection(TASKLISTS).onSnapshot(snapshot => {})
         taskListsUnsubscribe();
 
+        var taskLists = getState().remoteTaskLists.filter(item => {
+            return item.project !== projectId;
+        })
+        dispatch(receiveRemoteTaskLists(taskLists));
+
         // Tasks.
         var tasksUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).collection(TASKS).onSnapshot(snapshot => {})
         tasksUnsubscribe();
+        
+        var tasks = getState().remoteTasks.filter(item => {
+            return item.project !== projectId;
+        })
+        dispatch(receiveRemoteTasks(tasks));
 
         // ProjectLayout.
         var projectLayoutsUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).collection(PROJECTLAYOUTS).onSnapshot(snapshot => {})
         projectLayoutsUnsubscribe();
+
+        var projectLayouts = getState().remoteProjectLayouts.filter(item => {
+            return item.project !== projectId;
+        })
+        dispatch(receiveRemoteProjectLayouts(projectLayouts));
     }
 }
 
-
-export function makeProjectRemoteAsync(projectId, projectName) {
+export function migrateProjectBackToLocalAsync(projectId, projectName) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        // Transfer Project.
-        var userRef = getfirestore().collection(USERS).doc(getUserUid());
-        var batch = getFirestore().batch();
+        dispatch(setIsShareMenuWaiting(true));
+        dispatch(setShareMenuMessage("Migrating project."))
 
-        // Top Level Project Data.
-        var topLevelData = { 
-            uid: projectId,
-            projectName: projectName,
-            members: [new MemberStore(getUserUid(), getState().displayName, getState().userEmail)]}
-        var topLevelRef = getFirestore().collection(REMOTES).doc(projectId);
-        batch.set(topLevelRef, topLevelData);
+        var kickAllUsersFromProject = getFunctions().httpsCallable('kickAllUsersFromProject');
+        kickAllUsersFromProject({projectId: projectId}).then(result => {
+            if (result.data.status === 'complete') {
+                dispatch(unsubscribeFromDatabaseAsync());
 
-        // Project Layout
-        requests.push(userRef.collection(PROJECTLAYOUTS).doc(projectId).get().then( layoutDoc => {
-            if (layoutDoc.exists) {
-                var ref = getFirestore().collection(REMOTES).doc(projectId).collection(PROJECTLAYOUTS).doc(layoutDoc.id);
-                batch.set(ref, layoutDoc.data());
-            }
-        }));
-
-        // Task Lists.
-        requests.push(userRef.collection(TASKLISTS).where('project', '==', projectId).get().then( taskListsSnapshot => {
-            if (taskListsSnapshot.exists) {
-                taskListsSnapshot.forEach( taskListDoc => {
-                    var ref = getFirestore.collection(REMOTES).doc(projectId).collection(TASKLISTS).doc(taskListDoc.id);
-                    batch.set(ref, taskListDoc.data());
-                })
-            }
-        }));
-
-        // Tasks.
-        requests.push(userRef.collection(TASKS).where('project', '==', projectId).get().then( tasksSnapshot => {
-            if (tasksSnapshot.exists) {
-                tasksSnapshot.forEach( taskDoc => {
-                    var ref = getFirestore.collection(REMOTES).doc(projectId).collection(TASKS).doc(taskDoc.id);
-                    batch.set(ref, taskDoc.data());
-                })
-            }
-        }));
-
-        Promise.all(requests).then(() => {
-            batch.commit().then(() => {
-                // Delete Original Project from Local Location.
-                dispatch(removeProjectAsync(projectId));
-
-                // Add the Id of the project to the users RemoteProjectId's collection.
-                ref = getFirestore().collection(USERS).doc(getUserUid()).collection(REMOTE_IDS).doc();
-                ref.set({ remoteId: projectId }).then(() => {
-                    // Success.
+                moveProjectToLocalLocationAsync(getFirestore, projectId, projectName).then( () => {
+                    dispatch(subscribeToDatabaseAsync());
+                    dispatch(setIsShareMenuWaiting(false));
+                    dispatch(setShareMenuMessage(""));
                 }).catch(error => {
-                    dispatch(postSnackbarMessage('Error while creating entry in remoteIds ' + error.message, false));
+                    dispatch(postSnackbarMessage(error.message, false));
+                    dispatch(setIsShareMenuWaiting(false));
+                    dispatch(setShareMenuMessage(""));
                 })
+            }
 
-            }).catch(error => {
-                dispatch(postSnackbarMessage('Error while moving Local Project: ' + error.message, false));
-            })
+            if (result.data.status === 'error') {
+                dispatch(postSnackbarMessage(result.data.message, false));
+                dispatch(setIsShareMenuWaiting(false));
+                dispatch(setShareMenuMessage(""));
+            }
+        }).catch(error => {
+            var message = `An Error occured, are you sure you are connected to the internet? Error Message : ${error.message}`;
+            dispatch(postSnackbarMessage(message, false));
+            dispatch(setIsShareMenuWaiting(false));
+            dispatch(setShareMenuMessage(""));
         })
     }
 }
 
+function moveProjectToLocalLocationAsync(getFirestore, projectId, projectName) {
+    return new Promise((resolve, reject) => {
+        // Transfer Project to Local Location.
+        var remoteRef = getFirestore().collection(REMOTES).doc(projectId);
+        var targetBatch = getFirestore().batch();
+        var sourceBatch = getFirestore().batch();
+        var requests = [];
 
-export function inviteUserToProjectAsync(projectName, targetEmail, sourceEmail, sourceDisplayName, projectId, isRemote) {
+        // Top Level Project Data.
+        var project = {
+            uid: projectId,
+            projectName: projectName,
+            isRemote: false,
+        }
+
+        // Project
+        var topLevelUserRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).doc(projectId);
+        targetBatch.set(topLevelUserRef, project);
+        
+        var topLevelRemoteRef = getFirestore().collection(REMOTES).doc(projectId);
+        sourceBatch.delete(topLevelRemoteRef);
+
+        // Project Layout
+        requests.push(remoteRef.collection(PROJECTLAYOUTS).doc(projectId).get().then(layoutDoc => {
+            if (layoutDoc.exists) {
+                var ref = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTLAYOUTS).doc(layoutDoc.id);
+                targetBatch.set(ref, layoutDoc.data());
+                sourceBatch.delete(layoutDoc.ref);
+            }
+        }));
+
+        // Task Lists.
+        requests.push(remoteRef.collection(TASKLISTS).where('project', '==', projectId).get().then(taskListsSnapshot => {
+            taskListsSnapshot.forEach(taskListDoc => {
+                var ref = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKLISTS).doc(taskListDoc.id);
+                targetBatch.set(ref, taskListDoc.data());
+                sourceBatch.delete(taskListDoc.ref);
+            })
+        }));
+
+        // Tasks.
+        requests.push(remoteRef.collection(TASKS).where('project', '==', projectId).get().then(tasksSnapshot => {
+            tasksSnapshot.forEach(taskDoc => {
+                var ref = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).doc(taskDoc.id);
+                targetBatch.set(ref, taskDoc.data());
+                sourceBatch.delete(taskDoc.ref);
+            })
+        }));
+
+        // Remote Id would have been taken care of by kickAllUsersFromProject Server function.
+
+        Promise.all(requests).then(() => {
+            targetBatch.commit().then(() => {
+                sourceBatch.commit().then(() => {
+                    resolve();
+                }).catch(error => {
+                    reject(error);
+                })
+            }).catch(error => {
+                reject(error);
+            })
+        })
+    })  
+}
+
+export function inviteUserToProjectAsync(projectName, targetEmail, sourceEmail, sourceDisplayName, projectId, role) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        dispatch(setIsInvitingUser(true));
+        dispatch(setIsShareMenuWaiting(true));
+        dispatch(setShareMenuMessage('Searching for User...'));
+
+        var slowMessageTimer = setTimeout(() => {
+            var message = "Hang tight!\nThe servers are waking up. Subsequent operations will complete faster."
+            dispatch(setShareMenuSubMessage(message));
+        }, 5000)
+
+        var getRemoteUserData = getFunctions().httpsCallable('getRemoteUserData');
+        getRemoteUserData({ targetEmail: targetEmail }).then(result => {
+            if (result.data.status === 'user found') {
+                // User Found.
+                var userData = result.data.userData;
+                var inviteData = {
+                    projectName: projectName,
+                    sourceEmail: sourceEmail,
+                    sourceDisplayName: sourceDisplayName,
+                    targetDisplayName: userData.displayName,
+                    targetEmail: userData.email,
+                    projectId: projectId,
+                    targetUserId: userData.userId,
+                    sourceUserId: getUserUid(),
+                    role: role,
+                }
+
+                // If the project isn't Remote already it needs to be Moved. Promise will resolve Imediately if no migration
+                // is required, otherwise it will resolve when migration is complete.
+                maybeMigrateProjectAsync(dispatch, getFirestore, getState, projectId, projectName).then(() => {
+                    dispatch(setShareMenuMessage('Sending invite.'));
+
+                    var sendProjectInvite = getFunctions().httpsCallable('sendProjectInvite');
+                    sendProjectInvite(inviteData).then(result => {
+                        if (result.data.status === 'complete') {
+                            dispatch(postSnackbarMessage("Invite sent.", true));
+                            dispatch(setIsShareMenuWaiting(false));
+                            dispatch(setShareMenuMessage(""));
+                            dispatch(setShareMenuSubMessage(""));
+                            dispatch(selectProject(projectId));
+                            clearTimeout(slowMessageTimer);
+                        }
+
+                        else {
+                            dispatch(postSnackbarMessage(result.data.error));
+                            dispatch(setIsShareMenuWaiting(false));
+                            dispatch(setShareMenuMessage(""));
+                            dispatch(setShareMenuSubMessage(""));
+                            clearTimeout(slowMessageTimer);
+                        }
+                    })
+                })
+            }
+
+            else {
+                // User not Found.
+                dispatch(postSnackbarMessage('User not Found.', true));
+                dispatch(setIsShareMenuWaiting(false));
+                dispatch(setShareMenuMessage(""));
+                dispatch(setShareMenuSubMessage(""));
+                clearTimeout(slowMessageTimer);
+            }
+        }).catch(error => {
+            dispatch(setIsShareMenuWaiting(false));
+            dispatch(setShareMenuMessage(''));
+            var message = `An Error occured, are you sure you are connected to the internet? Error Message : ${error.message}`;
+            dispatch(postSnackbarMessage(message, false));
+            dispatch(setShareMenuMessage(""));
+            dispatch(setShareMenuSubMessage(""));
+            clearTimeout(slowMessageTimer);
+        })
+
     }
+}
+
+export function updateMemberRoleAsync(userId, projectId, newRole) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(setUpdatingUserId(userId));
+
+        var memberRef = getFirestore().collection(REMOTES).doc(projectId).collection(MEMBERS).doc(userId);
+        memberRef.update({ role: newRole }).then( () => {
+            dispatch(setUpdatingUserId(-1));
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
+        })
+    }
+}
+
+export function kickUserFromProjectAsync(projectId, userId) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(setUpdatingUserId(userId));
+
+        var kickUserFromProject = getFunctions().httpsCallable('kickUserFromProject');
+        kickUserFromProject({userId: userId, projectId: projectId}).then( result => {
+            dispatch(setUpdatingUserId(-1));
+        })
+    }
+}
+
+function maybeMigrateProjectAsync(dispatch, getFirestore, getState, projectId, projectName) {
+    // Maybe migrate the project first if requried. Saves you copying the code into two branches of an if else.
+    // If project is already remote, promise will resolve imediately and allow further execution to continue, otherwise it will
+    // hold.. This is maybe a good candidate for await/async.
+    return new Promise((resolve, reject) => {
+        if (!isProjectRemote(getState, projectId)) {
+            // Migrate project to 'remotes' collection.
+            dispatch(setShareMenuMessage('Migrating Project...'));
+            dispatch(unsubscribeFromDatabaseAsync(projectId));
+
+            moveProjectToRemoteLocationAsync(getFirestore, getState, projectId, projectName).then(() => {
+                dispatch(subscribeToDatabaseAsync())
+
+                resolve();
+            }).catch(error => {
+                dispatch(postSnackbarMessage(error.message, false));
+                
+                reject();
+            })
+        }
+
+        else {
+            resolve();
+        }
+    })
+}
+
+
+function moveProjectToRemoteLocationAsync(getFirestore, getState, projectId, projectName)  {
+    return new Promise((resolve, reject) => {
+        // Transfer Project.
+        var userRef = getFirestore().collection(USERS).doc(getUserUid());
+        var targetBatch = getFirestore().batch();
+        var sourceBatch = getFirestore().batch();
+        var requests = [];
+
+        // Top Level Project Data.
+        var topLevelData = {
+            uid: projectId,
+            projectName: projectName,
+            isRemote: true,
+        }
+        var topLevelRef = getFirestore().collection(REMOTES).doc(projectId);
+        targetBatch.set(topLevelRef, topLevelData);
+        sourceBatch.delete(getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).doc(projectId));
+
+        // Members.
+        var newMember = new MemberStore(getUserUid(), projectId, getState().displayName, getState().userEmail, 'added', 'owner');
+        var memberRef = getFirestore().collection(REMOTES).doc(projectId).collection(MEMBERS).doc(newMember.userId);
+        targetBatch.set(memberRef, Object.assign({}, newMember));
+
+        // Project Layout
+        requests.push(userRef.collection(PROJECTLAYOUTS).doc(projectId).get().then(layoutDoc => {
+            if (layoutDoc.exists) {
+                var ref = getFirestore().collection(REMOTES).doc(projectId).collection(PROJECTLAYOUTS).doc(layoutDoc.id);
+                targetBatch.set(ref, layoutDoc.data());
+                sourceBatch.delete(layoutDoc.ref);
+            }
+        }));
+
+        // Task Lists.
+        requests.push(userRef.collection(TASKLISTS).where('project', '==', projectId).get().then(taskListsSnapshot => {
+            taskListsSnapshot.forEach(taskListDoc => {
+                var ref = getFirestore().collection(REMOTES).doc(projectId).collection(TASKLISTS).doc(taskListDoc.id);
+                targetBatch.set(ref, taskListDoc.data());
+                sourceBatch.delete(taskListDoc.ref);
+            })
+        }));
+
+        // Tasks.
+        requests.push(userRef.collection(TASKS).where('project', '==', projectId).get().then(tasksSnapshot => {
+            tasksSnapshot.forEach(taskDoc => {
+                var ref = getFirestore().collection(REMOTES).doc(projectId).collection(TASKS).doc(taskDoc.id);
+                targetBatch.set(ref, taskDoc.data());
+                sourceBatch.delete(taskDoc.ref);
+            })
+        }));
+
+        // Place RemoteId.
+        var remoteIdRef = getFirestore().collection(USERS).doc(getUserUid()).collection(REMOTE_IDS).doc(projectId);
+        sourceBatch.set(remoteIdRef, {projectId: projectId});
+
+        Promise.all(requests).then(() => {
+            targetBatch.commit().then(() => {
+                sourceBatch.commit().then( () => {
+                    resolve();
+                }).catch(error => {
+                    reject('Error while removing local references: ' + error.message);
+                })
+            }).catch(error => {
+                reject('Error while moving Local Project: ' + error.message);
+            })
+        })
+    })
 }
 
 export function attachAuthListenerAsync() {
@@ -593,6 +988,7 @@ export function attachAuthListenerAsync() {
                 dispatch(subscribeToDatabaseAsync());
                 dispatch(setIsLoggedInFlag(true));
                 dispatch(setUserEmail(user.email));
+                dispatch(setDisplayName(user.displayName));
                 dispatch(setAuthStatusMessage("Logged in"));
             }
 
@@ -605,6 +1001,7 @@ export function attachAuthListenerAsync() {
                     dispatch(unsubscribeFromDatabaseAsync());
                     dispatch(setIsLoggedInFlag(false));
                     dispatch(setUserEmail(""));
+                    dispatch(setDisplayName(""));
                     dispatch(selectProject(-1));
                     dispatch(clearData());
 
@@ -620,6 +1017,9 @@ export function subscribeToDatabaseAsync() {
         // Get Projects (Also attaches a Value listener for future changes).
         dispatch(getProjectsAsync());
 
+        // Local Project Layouts.
+        dispatch(getLocalProjectLayoutsAsync());
+
         // Remote Projects (Also attaches a Value listener for future changes).
         dispatch(getRemoteProjectIdsAsync());
 
@@ -631,17 +1031,48 @@ export function subscribeToDatabaseAsync() {
 
         // Get Account Config (Also attaches a Value listener for future changes).
         dispatch(getAccountConfigAsync());
+
+        // Project Invites (Also attaches a Value listener for future changes).
+        dispatch(getInvitesAsync());
+    }
+}
+
+export function getInvitesAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        getFirestore().collection(USERS).doc(getUserUid()).collection(INVITES).onSnapshot(snapshot => {
+            if (snapshot.docChanges().length > 0) {
+                var invites = [];
+                snapshot.forEach(doc => {
+                    invites.push(doc.data());
+                })
+
+                dispatch(receiveInvites(invites));
+            }
+        })
     }
 }
 
 export function unsubscribeFromDatabaseAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(unsubscribeProjectsAsync());
-        dispatch(unsubscribeFromRemoteProjectAsync());
+
+        getState().remoteProjectIds.forEach(id => {
+            dispatch(unsubscribeFromRemoteProjectAsync(id));
+        })
+
+        dispatch(unsubscribeRemoteIds());
         dispatch(unsubscribeTaskListsAsync());
         dispatch(unsubscribeTasksAsync());
         dispatch(unsubscribeProjectLayoutsAsync());
         dispatch(unsubscribeAccountConfigAsync());
+        dispatch(unsubscribeInvitesAsync());
+    }
+}
+
+export function unsubscribeRemoteIds() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        var unsubscribe = getFirestore().collection(USERS).doc(getUserUid()).collection(REMOTE_IDS).onSnapshot(snap => {});
+        unsubscribe();
     }
 }
 
@@ -678,25 +1109,6 @@ export function logInUserAsync(email,password) {
         })
 
 
-    }
-}
-
-
-export function selectProjectAsync(projectId) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        var outgoingProjectId = getState().selectedProjectId;
-        var incomingProjectId = projectId;
-
-        if (outgoingProjectId !== -1) {
-            // Old Listeners.
-            dispatch(unsubscribeProjectLayoutsAsync(projectId));
-        } 
-
-        if (incomingProjectId !== -1) {
-            dispatch(getProjectLayoutsAsync(projectId));
-        }
-
-        dispatch(selectProject(projectId));
     }
 }
 
@@ -879,7 +1291,7 @@ export function getDatabaseInfoAsync() {
     }
 }
 
-export function updateTaskPriority(taskId, newValue) {
+export function updateTaskPriority(taskId, newValue, currentMetadata) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(closeCalendar());
 
@@ -889,6 +1301,7 @@ export function updateTaskPriority(taskId, newValue) {
         // Update Firestore.
         taskRef.update({
             isHighPriority: newValue,
+            metadata: getUpdatedMetadata(currentMetadata, { updatedBy: getState().displayName, updatedOn: getHumanFriendlyDate() })
         }).then(() => {
             // Careful what you do here, promises don't resolve if you are offline.
         }).catch(error => {
@@ -897,7 +1310,7 @@ export function updateTaskPriority(taskId, newValue) {
     }
 }
 
-export function updateTaskDueDateAsync(taskId, newDate) {
+export function updateTaskDueDateAsync(taskId, newDate, currentMetadata) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(closeCalendar());
 
@@ -905,7 +1318,8 @@ export function updateTaskDueDateAsync(taskId, newDate) {
         var taskRef = getTaskRef(getFirestore, getState, taskId);
         taskRef.update({
             dueDate: newDate,
-            isNewTask: false
+            isNewTask: false,
+            metadata: getUpdatedMetadata(currentMetadata, { updatedBy: getState().displayName, updatedOn: getHumanFriendlyDate() })
         }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(error => {
@@ -988,7 +1402,6 @@ export function updateProjectNameAsync(projectId, newValue) {
 
 export function removeProjectAsync(projectId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-
         if (getState.selectedProjectId !== -1) {
             // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
             // been loaded in via the handleProjectSelectorClick method. No point in querying Firebase again for this data.
@@ -1028,9 +1441,9 @@ export function removeProjectAsync(projectId) {
             }
             
             // Project Layout
-            var projectLayoutId = getState().projectLayout.uid;
+            var projectLayoutId = projectId;
             if (projectLayoutId !== -1) {
-                batch.delete(getProjectLayoutRef(getFirestore, getState, projectLayoutId));
+                batch.delete(getProjectLayoutRef(getFirestore, getState, projectLayoutId).doc(projectLayoutId));
             }
 
             // Project.
@@ -1042,6 +1455,37 @@ export function removeProjectAsync(projectId) {
             }).catch(error => {
                 handleFirebaseUpdateError(error, getState(), dispatch);
             })
+        }
+    }
+}
+
+export function removeRemoteProjectAsync(projectId) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        if (projectId !== -1 && isProjectRemote(getState, projectId)) {
+            dispatch(setIsShareMenuWaiting(true));
+            dispatch(setShareMenuMessage("Deleting Project"));
+
+            var removeRemoteProject = getFunctions().httpsCallable('removeRemoteProject');
+            removeRemoteProject({projectId: projectId}).then(result => {
+                if (result.data.status === 'complete') {
+                    dispatch(selectProject(-1));
+                    dispatch(setIsShareMenuOpen(false));
+                    dispatch(setIsShareMenuWaiting(false));
+                    dispatch(setShareMenuMessage(""));
+
+                }
+
+                if (result.data.status === 'error') {
+                    dispatch(postSnackbarMessage(result.data.message));
+                    dispatch(setIsShareMenuWaiting(false));
+                    dispatch(setShareMenuMessage(""));
+                }
+            }).catch(error => {
+                var message = `An Error occured, are you sure you are connected to the internet? Error Message : ${error.message}`; 
+                dispatch(postSnackbarMessage(message, false));
+                dispatch(setIsShareMenuWaiting(false));
+                dispatch(setShareMenuMessage(""));
+            }) 
         }
     }
 }
@@ -1063,7 +1507,7 @@ export function addNewProjectAsync() {
         // Layout
         var newLayoutRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTLAYOUTS).doc(newProjectKey);
 
-        var newProjectLayout = new ProjectLayoutStore({}, newProjectKey, newProjectKey);
+        var newProjectLayout = new ProjectLayoutStore([], newProjectKey, newProjectKey);
         batch.set(newLayoutRef, Object.assign({}, newProjectLayout));
 
         // Execute Additions.
@@ -1075,11 +1519,11 @@ export function addNewProjectAsync() {
     }
 }
 
-export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
+export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue, currentMetadata) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (getState().selectedTask.taskListWidgetId !== taskListWidgetId &&
             getState().selectedTask.taskId !== taskId) {
-            dispatch(selectTask(taskListWidgetId, taskId));
+            dispatch(selectTask(taskListWidgetId, taskId, false));
         }
 
         // Update Firestore.
@@ -1087,7 +1531,12 @@ export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
 
         taskRef.update({
             isComplete: newValue,
-            isNewTask: false
+            isNewTask: false,
+            metadata: getUpdatedMetadata(currentMetadata, {
+                updatedBy: getState().displayName,
+                updatedOn: getHumanFriendlyDate(),
+                completedBy: getState().displayName
+            })
         }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.h.
         }).catch(error => {
@@ -1098,11 +1547,11 @@ export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue) {
 
 export function updateProjectLayoutAsync(layouts, projectId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        var newTrimmedLayouts = trimLayoutsHelper(layouts);
+        var newTrimmedLayouts = sanitizeLayouts(layouts);
 
         // Update Firestore.
         var projectLayoutsRef = getProjectLayoutRef(getFirestore, getState, projectId);
-        projectLayoutsRef.update({ layouts: newTrimmedLayouts }).then(() => {
+        projectLayoutsRef.doc(projectId).update({ layouts: newTrimmedLayouts }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(error => {
             handleFirebaseUpdateError(error, getState(), dispatch);
@@ -1111,13 +1560,14 @@ export function updateProjectLayoutAsync(layouts, projectId) {
 }
 
 
-export function updateTaskNameAsync(taskListWidgetId, taskId, newData) {
+export function updateTaskNameAsync(taskListWidgetId, taskId, newData, currentMetadata) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(closeTask(taskListWidgetId, taskId));
 
         var update = {
             taskName: newData,
-            isNewTask: false // Reset new Task Property.
+            isNewTask: false, // Reset new Task Property.
+            metadata: getUpdatedMetadata(currentMetadata, {updatedBy: getState().displayName, updatedOn: getHumanFriendlyDate()})
         }
 
         // Returns a new Update Object with arguments parsed in (if any);
@@ -1151,7 +1601,7 @@ export function removeSelectedTaskAsync() {
                 handleFirebaseUpdateError(error, getState(), dispatch);
             });
 
-            dispatch(selectTask(getState().focusedTaskListId, -1));
+            dispatch(selectTask(getState().focusedTaskListId, -1, false));
         }
     }
 }
@@ -1178,8 +1628,12 @@ export function moveTaskAsync(destinationTaskListId) {
         var movingTaskId = getState().movingTaskId;
         var taskRef = getTaskRef(getFirestore, getState, movingTaskId);
 
+        // Can't get currentMetadata from the Task directly, so extract it here.
+        var currentMetadata = getState().tasks.find(task => {return task.uid === movingTaskId}).metadata;
+
         taskRef.update({
-            taskList: destinationTaskListId
+            taskList: destinationTaskListId,
+            metadata: getUpdatedMetadata(currentMetadata, {updatedBy: getState().displayName, updatedOn: getHumanFriendlyDate()}),
         }).then(() => {
             /// Carefull what you do here, promises don't resolve if you are offline.
         }).catch(error => {
@@ -1210,8 +1664,9 @@ export function addNewTaskAsync() {
                     newTaskRef = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).doc();
                 }
                 
-                var newTaskKey = newTaskRef.id;
+                var metadata = new TaskMetadataStore(getState().displayName, getHumanFriendlyDate(new Date()), "", "", "");
 
+                var newTaskKey = newTaskRef.id;
                 var newTask = new TaskStore(
                     "",
                     "",
@@ -1221,7 +1676,8 @@ export function addNewTaskAsync() {
                     newTaskKey,
                     new Moment().toISOString(),
                     true,
-                    false
+                    false,
+                    Object.assign({},metadata),
                 )
 
                 newTaskRef.set(Object.assign({}, newTask)).then(() => {
@@ -1283,7 +1739,7 @@ export function getAccountConfigAsync() {
                     parseInt(accountConfig.favouriteProjectId) :
                     accountConfig.favouriteProjectId;
 
-                dispatch(selectProjectAsync(favouriteProjectId));
+                dispatch(selectProject(favouriteProjectId));
             }
         }, error => {
             handleFirebaseSnapshotError(error, getState(), dispatch);
@@ -1306,7 +1762,7 @@ export function getProjectsAsync() {
                     projects.push(doc.data());
                 })
 
-                dispatch(receiveProjects(projects));
+                dispatch(receiveLocalProjects(projects));
             }
         }, error => {
             handleFirebaseSnapshotError(error, getState(), dispatch);
@@ -1330,7 +1786,9 @@ export function getTasksAsync() {
 
 function handleTasksSnapshot(getState, dispatch, isRemote, snapshot, remoteProjectId) {
     // Handle Metadata.
-    dispatch(setTasksHavePendingWrites(snapshot.metadata.hasPendingWrites))
+    if (snapshot.metadata !== undefined) {
+        dispatch(setTasksHavePendingWrites(snapshot.metadata.hasPendingWrites))
+    }
 
     // Handle Tasks.
     if (snapshot.docChanges().length > 0) {
@@ -1340,14 +1798,19 @@ function handleTasksSnapshot(getState, dispatch, isRemote, snapshot, remoteProje
         });
 
         if (isRemote) {
-            var filteredTasks = getState().tasks.filter(item => {
+            var filteredTasks = getState().remoteTasks.filter(item => {
                 return item.project !== remoteProjectId;
             })
 
-            tasks = [...tasks, ...filteredTasks];            
+            tasks = [...tasks, ...filteredTasks];   
+            dispatch(receiveRemoteTasks(tasks));         
+        }
+        
+        else {
+            dispatch(receiveLocalTasks(tasks));
         }
 
-        dispatch(receiveTasks(tasks));
+        
         
     }
 }
@@ -1358,16 +1821,19 @@ export function getTaskListsAsync(projectId) {
 
         // Get Tasklists from Firestore.
         getFirestore().collection(USERS).doc(getUserUid()).collection(TASKLISTS).onSnapshot(includeMetadataChanges, snapshot => {
-            handleTaskListsSnapshot(dispatch, false, snapshot, projectId)
+    
+            handleTaskListsSnapshot(getState, dispatch, false, snapshot, projectId)
         }, error => {
             handleFirebaseSnapshotError(error, getState(), dispatch);
         });
     }
 }
 
-function handleTaskListsSnapshot(dispatch, isRemote, snapshot, remoteProjectId) {
+function handleTaskListsSnapshot(getState, dispatch, isRemote, snapshot, remoteProjectId) {
     // Handle Metadata.
-    dispatch(setTaskListsHavePendingWrites(snapshot.metadata.hasPendingWrites));
+    if (snapshot.metadata !== undefined ) {
+        dispatch(setTaskListsHavePendingWrites(snapshot.metadata.hasPendingWrites));
+    }
 
     if (snapshot.docChanges().length > 0) {
         var taskLists = [];
@@ -1376,33 +1842,35 @@ function handleTaskListsSnapshot(dispatch, isRemote, snapshot, remoteProjectId) 
         })
 
         if (isRemote) {
-            if (isRemote) {
-                var filteredTaskLists = getState().taskLists.filter(item => {
-                    return item.project !== remoteProjectId;
-                })
-    
-                taskLists = [...taskLists, ...filteredTaskLists];            
-            }
+            var filteredTaskLists = getState().remoteTaskLists.filter(item => {
+                return item.project !== remoteProjectId;
+            })
+
+            taskLists = [...taskLists, ...filteredTaskLists];
+            dispatch(receiveRemoteTaskLists(taskLists));
         }
 
-        dispatch(receiveTaskLists(taskLists));
+        else {
+            dispatch(receiveLocalTaskLists(taskLists));
+        }
+        
     }
 }
 
-export function getProjectLayoutsAsync(projectId) {
+export function getLocalProjectLayoutsAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(startProjectLayoutsFetch());
 
-        var projectLayoutsRef = getProjectLayoutRef(getFirestore, getState, projectId);
-        projectLayoutsRef.where("project", "==", projectId).onSnapshot(includeMetadataChanges, snapshot => {
-            handleProjectLayoutsSnapshot(dispatch, false, snapshot)
+        var projectLayoutsRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTLAYOUTS);
+        projectLayoutsRef.onSnapshot(includeMetadataChanges, snapshot => {
+            handleProjectLayoutsSnapshot(getState, dispatch, false, snapshot)
         }, error => {
             handleFirebaseSnapshotError(error, getState(), dispatch);
         });
     }
 }
 
-function handleProjectLayoutsSnapshot(dispatch, isRemote, snapshot) {
+function handleProjectLayoutsSnapshot(getState, dispatch, isRemote, snapshot, remoteProjectId) {
     // Handle Metadata.
     dispatch(setProjectLayoutsHavePendingWrites(snapshot.metadata.hasPendingWrites));
 
@@ -1414,17 +1882,19 @@ function handleProjectLayoutsSnapshot(dispatch, isRemote, snapshot) {
             })
         }
 
-        else {
-            projectLayouts[0] = new ProjectLayoutStore({}, -1, -1);
-        }
-
         if (isRemote) {
+            var filteredProjectLayouts = getState().remoteProjectLayouts.filter(item => {
+                return item.project !== remoteProjectId;
+            })
 
+            projectLayouts = [...projectLayouts, ...filteredProjectLayouts];   
+            dispatch(receiveRemoteProjectLayouts(projectLayouts));         
         }
 
         else {
-            dispatch(receiveProjectLayout(projectLayouts[0]));
+            dispatch(receiveLocalProjectLayouts(projectLayouts));
         }
+
         
     }
 }
@@ -1457,6 +1927,13 @@ export function unsubscribeTasksAsync() {
     }
 }
 
+export function unsubscribeInvitesAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        var invitesUnsubscribe = getFirestore().collection(USERS).doc(getUserUid()).collection(INVITES).onSnapshot(() => { });
+        invitesUnsubscribe();
+    }
+}
+
 export function unsubscribeProjectLayoutsAsync(projectId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (projectId !== -1) {
@@ -1469,6 +1946,49 @@ export function unsubscribeProjectLayoutsAsync(projectId) {
 }
 
 // Helper Functions.
+// Determine if an update to the Metadata should occur. Updates should be ignored for a set ammount of time after a Task is
+// created to stop CreatedAt and UpdatedAt times being the same or very similiar.
+function shouldUpdateMetadata(currentMetadata) {
+    if (currentMetadata.createdOn === undefined ||
+         currentMetadata.createdOn === null ||
+          currentMetadata.createdOn === "") {
+        return true;
+    }
+
+    // Determine Difference.
+    var createdOn = Moment(currentMetadata.createdOn, DATE_FORMAT);
+    var now = Moment();
+
+    return now.diff(createdOn, 'seconds') > 120
+}
+
+
+function getUpdatedMetadata(currentMetadata, update) {
+    // Coerce currentMetadata to a Valid object.
+    if (currentMetadata === undefined) {
+        currentMetadata = Object.assign({}, new TaskMetadataStore("","","","",""));
+    }
+
+    if (shouldUpdateMetadata(currentMetadata)) {;
+        // Merge update into currentMetadata.
+        for (var propertyName in update) {
+            currentMetadata[propertyName] = update[propertyName];
+        }
+    }
+    
+    return currentMetadata;
+    
+}
+
+function getHumanFriendlyDate(jsDate) {
+    if (jsDate === undefined) {
+        jsDate = new Date();
+    }
+    var date = Moment(jsDate).format(DATE_FORMAT);
+
+    return date;
+}
+
 function getProjectRef(getFirestore, getState, projectId) {
     if (isProjectRemote(getState, projectId)) {
         return getFirestore().collection(REMOTES).doc(projectId);
@@ -1479,8 +1999,8 @@ function getProjectRef(getFirestore, getState, projectId) {
     }
 }
 
-function getProjectLayoutRef(getFirestore, getState, projectLayoutId) {
-    if (isProjectRemote(getState, getState().selectedProjectId)) {
+function getProjectLayoutRef(getFirestore, getState, projectId) {
+    if (isProjectRemote(getState, projectId)) {
         return getFirestore().collection(REMOTES).doc(projectId).collection(PROJECTLAYOUTS);
     }
 
@@ -1491,6 +2011,7 @@ function getProjectLayoutRef(getFirestore, getState, projectLayoutId) {
 
 function getTaskRef(getFirestore, getState, taskId) {
     var selectedProjectId = getState().selectedProjectId;
+
     if (isProjectRemote(getState, selectedProjectId)) {
         return getFirestore().collection(REMOTES).doc(selectedProjectId).collection(TASKS).doc(taskId);
     }
@@ -1512,7 +2033,8 @@ function getTaskListRef(getFirestore, getState, taskListId) {
 }
 
 function isProjectRemote(getState, projectId) {
-    return !getState().remoteProjectIds.find(item => item === projectId) === undefined 
+    var index = getState().remoteProjectIds.findIndex(id => { return id === projectId });
+    return index !== -1;
 }
 
 function handleFirebaseSnapshotError(error, state, dispatch) {
@@ -1640,7 +2162,8 @@ function collectTaskListRelatedTaskIds(tasks, taskListWidgetId) {
 }
 
 
-function trimLayoutsHelper(layouts) {
+function sanitizeLayouts(layouts) {
+    // Layouts from RGL come with Functions and undefined values as properties which can't be serialized to Firestore.
     var trimmedLayouts = layouts.map(item => {
         return {
             i: item.i,
@@ -1653,7 +2176,6 @@ function trimLayoutsHelper(layouts) {
 
     return trimmedLayouts
 }
-
 
 function syncAppToConfig(generalConfig, dispatch) {
     if (generalConfig.startLocked) {
