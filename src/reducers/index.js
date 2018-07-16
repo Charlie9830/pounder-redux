@@ -9,9 +9,9 @@ export function appReducer(state, action) {
             return { 
                 ...state,
                 focusedTaskListId: action.id,
-                openCalendarId: -1,
-                openTaskListSettingsMenuId: -1,
                 isTaskListJumpMenuOpen: false,
+                selectedTask: processSelectedTask(state.selectedTask, action.id),
+                openTaskOptionsId: -1,
             };
         
         case ActionTypes.SELECT_TASK:
@@ -43,6 +43,7 @@ export function appReducer(state, action) {
                     isInputOpen: true,
                     isMetadataOpen: false
                 },
+                openTaskOptionsId: -1,
                 isATaskMoving: false,
                 movingTaskId: -1,
                 sourceTaskListId: -1,
@@ -50,6 +51,12 @@ export function appReducer(state, action) {
                 openTaskListSettingsMenuId: -1
             }
 
+        case ActionTypes.SET_OPEN_TASK_LIST_WIDGET_HEADER_ID:
+            return {
+                ...state,
+                openTaskListWidgetHeaderId: action.value,
+            }
+        
         case ActionTypes.CLOSE_TASK:
             return {
                 ...state,
@@ -132,10 +139,10 @@ export function appReducer(state, action) {
                 projects: [...state.localProjects, ...action.projects]
             }
             
-        case ActionTypes.SET_UPDATING_USER_ID: {
+        case ActionTypes.SET_UPDATING_USER_IDS: {
             return {
                 ...state,
-                updatingUserId: action.value,
+                updatingUserIds: action.value,
             }
         }
 
@@ -183,10 +190,10 @@ export function appReducer(state, action) {
                 isLockScreenDisplayed: true,
             }
         
-        case ActionTypes.SET_LAST_BACKUP_MESSAGE:
+        case ActionTypes.SET_LAST_BACKUP_DATE:
             return {
                 ...state,
-                lastBackupMessage: action.message
+                lastBackupDate: action.value,
             }
 
         case ActionTypes.SET_OPEN_TASKLIST_SETTINGS_MENU_ID: 
@@ -205,6 +212,7 @@ export function appReducer(state, action) {
                     isInputOpen: false,
                     isMetadataOpen: false,
                 },
+                openTaskOptionsId: -1,
                 openCalendarId: action.taskId
             }
 
@@ -277,6 +285,12 @@ export function appReducer(state, action) {
                 isAwaitingFirebase: false,
                 remoteProjectLayout: action.projectLayout
             }
+
+        case ActionTypes.SET_OPEN_PROJECT_SELECTOR_ID:
+            return {
+                ...state,
+                openProjectSelectorId: action.value,
+            }
         
         case ActionTypes.SELECT_PROJECT:
             return {
@@ -290,6 +304,9 @@ export function appReducer(state, action) {
                     isInputOpen: false,
                     isMetadataOpen: false
                 },
+                openTaskOptionsId: -1,
+                openTaskListWidgetHeaderId: -1,
+                openProjectSelectorId: action.projectId === state.openProjectSelectorId ? state.openProjectSelectorId : -1,
                 isATaskMoving: false,
                 movingTaskId: -1,
                 sourceTaskListId: -1,
@@ -371,11 +388,26 @@ export function appReducer(state, action) {
             }
         
         case ActionTypes.RECEIVE_GENERAL_CONFIG: {
-            return {
-                ...state,
-                generalConfig: action.value,
-                isDexieConfigLoadComplete: true,
+            if (isFirstTimeBoot(action.value)) {
+                // First Time Boot.
+                return {
+                    ...state,
+                    generalConfig: action.value,
+                    isDexieConfigLoadComplete: true,
+                    isAppSettingsOpen: true,
+                    appSettingsMenuPage: 'account',
+                }
             }
+
+            else {
+                // Normal Config Update.
+                return {
+                    ...state,
+                    generalConfig: action.value,
+                    isDexieConfigLoadComplete: true,
+                }
+            }
+            
         }
 
         case ActionTypes.SET_IS_STARTING_UP_FLAG: {
@@ -457,12 +489,20 @@ export function appReducer(state, action) {
             }
         }
 
+        case ActionTypes.SET_OPEN_TASK_OPTIONS_ID: {
+            return {
+                ...state,
+                openTaskOptionsId: action.value,
+            }
+        }
+
         case ActionTypes.POST_SNACKBAR_MESSAGE: {
             return {
                 ...state,
                 isSnackbarOpen: true,
                 snackbarMessage: action.message,
                 isSnackbarSelfDismissing: action.isSelfDismissing,
+                snackbarType: action.snackbarType
             }
         }
 
@@ -552,7 +592,7 @@ export function appReducer(state, action) {
                 remoteProjectIds: action.value,
             }
         }
-        
+
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);
             return state;
@@ -560,6 +600,27 @@ export function appReducer(state, action) {
 }
 
 // Helper Methods.
+function isFirstTimeBoot(generalConfig) {
+    if (generalConfig !== undefined && generalConfig.isFirstTimeBoot !== undefined) {
+        return generalConfig.isFirstTimeBoot;
+    }
+
+    else {
+        return false;
+    }
+}
+
+
+function processSelectedTask(selectedTask, focusingTaskListId) {
+    if (selectedTask.taskListWidgetId !== focusingTaskListId) {
+        return { taskListWidgetId: -1, taskId: -1, isInputOpen: false, isMetadataOpen: false}
+    }
+
+    else {
+        return selectedTask;
+    }
+}
+
 function isProjectRemote(state, projectId) {
     var index = state.remoteProjectIds.findIndex(id => { return id === projectId });
     return index !== -1;

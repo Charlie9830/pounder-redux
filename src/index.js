@@ -39,6 +39,8 @@ var initialState = {
     localTasks: [],
     remoteTasks: [],
     focusedTaskListId: -1,
+    openTaskListWidgetHeaderId: -1,
+    openProjectSelectorId: -1,
     projectLayouts: [],
     localProjectLayouts: [],
     remoteProjectLayouts: [],
@@ -53,7 +55,7 @@ var initialState = {
     isAwaitingFirebase: false,
     projectSelectorDueDateDisplays: [],
     isLockScreenDisplayed: false,
-    lastBackupMessage: "",
+    lastBackupDate: "",
     openTaskListSettingsMenuId: -1,
     projectsHavePendingWrites: false,
     projectLayoutsHavePendingWrites: false,
@@ -80,20 +82,22 @@ var initialState = {
     displayName: "",
     isSnackbarOpen: false,
     snackbarMessage: "",
+    snackbarType: "infomation",
     isSnackbarSelfDismissing: false,
     isSidebarOpen: true,
     isShareMenuOpen: false,
     isShareMenuWaiting: false,
     shareMenuMessage: "",
     shareMenuSubMessage: "",
-    updatingUserId: -1,
-    updatingInviteIds: {},
+    updatingUserIds: [],
+    updatingInviteIds: [],
+    openTaskOptionsId: -1,
 }
 
 export var appStore = createStore(
     appReducer,
     initialState,
-    applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth, getDexie, getFunctions } ),  /*Logger*/  )
+    applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth, getDexie, getFunctions } ),  /* Logger */ )
 );
 
 // Types.

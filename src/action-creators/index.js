@@ -1,22 +1,49 @@
 import * as ActionTypes from '../action-types/index';
-import { setUserUid, getUserUid, USERS, PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS, ACCOUNT, ACCOUNT_DOC_ID,
-     REMOTE_IDS, REMOTES, MEMBERS, INVITES } from 'pounder-firebase';
+import FirestoreBatchPaginator from 'firestore-batch-paginator';
+import { USERS, PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS, ACCOUNT, ACCOUNT_DOC_ID,
+     REMOTE_IDS, REMOTES, MEMBERS, INVITES, DIRECTORY } from 'pounder-firebase/paths';
+import { setUserUid, getUserUid } from 'pounder-firebase';
 import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore, CssConfigStore, MemberStore,
-InviteStore, RemoteStore, TaskMetadataStore} from 'pounder-stores';
+InviteStore, RemoteStore, TaskMetadataStore, DirectoryStore} from 'pounder-stores';
 import Moment from 'moment';
 import { includeMetadataChanges } from '../index';
 import parseArgs from 'minimist';
 import stringArgv from 'string-argv';
+import Fuse from 'fuse.js';
 import { getDayPickerDate, getClearedDate, getDaysForwardDate, getWeeksForwardDate, getParsedDate } from 'pounder-utilities';
+var loremIpsum = require('lorem-ipsum');
 
 const legalArgsRegEx = / -dd | -hp /i;
 const DATE_FORMAT = 'dddd MMMM Do YYYY, h:mm a';
 
+var newUser = null;
+
 // Standard Action Creators.
-export function setUpdatingUserId(userId) {
+export function setOpenProjectSelectorId(projectId) {
     return {
-        type: ActionTypes.SET_UPDATING_USER_ID,
-        value: userId,
+        type: ActionTypes.SET_OPEN_PROJECT_SELECTOR_ID,
+        value: projectId,
+    }
+}
+
+export function setUpdatingUserIds(userIds) {
+    return {
+        type: ActionTypes.SET_UPDATING_USER_IDS,
+        value: userIds,
+    }
+}
+
+export function setOpenTaskListWidgetHeaderId(taskListId) {
+    return {
+        type: ActionTypes.SET_OPEN_TASK_LIST_WIDGET_HEADER_ID,
+        value: taskListId,
+    }
+}
+
+export function setOpenTaskOptionsId(taskId) {
+    return {
+        type: ActionTypes.SET_OPEN_TASK_OPTIONS_ID,
+        value: taskId,
     }
 }
 
@@ -99,11 +126,12 @@ export function dismissSnackbar() {
     }
 }
 
-export function postSnackbarMessage(message, isSelfDismissing) {
+export function postSnackbarMessage(message, isSelfDismissing, type) {
     return {
         type: ActionTypes.POST_SNACKBAR_MESSAGE,
         message: message,
         isSelfDismissing: isSelfDismissing,
+        snackbarType: type,
     }
 }
 
@@ -321,10 +349,10 @@ export function unlockApp() {
     }
 }
 
-export function setLastBackupMessage(message) {
+export function setLastBackupDate(date) {
     return {
-        type: ActionTypes.SET_LAST_BACKUP_MESSAGE,
-        message: message
+        type: ActionTypes.SET_LAST_BACKUP_DATE,
+        value: date,
     }
 }
 
@@ -481,25 +509,65 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
+export function updateTaskAssignedToAsync(userId, taskId) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(closeCalendar());
+        var taskRef = getTaskRef(getFirestore, getState, taskId);
+        
+        taskRef.update({assignedTo: userId }).then( () => {
+            // Careful what you do here, Promises don't resolve Offline.
+        }).catch(error => {
+            handleFirebaseUpdateError(error, getState(), dispatch);
+        })
+    }
+}
+
+export function sendPasswordResetEmailAsync() {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        var email = getState().userEmail;
+
+        getAuth().sendPasswordResetEmail(email).then( () => {
+            dispatch(postSnackbarMessage("Password reset email sent.", true, 'affirmative-notification'));
+        }).catch(error => {
+            dispatch(postSnackbarMessage("An error occured: " + error.message, false, 'error'));
+        })
+    }
+}
+
 export function registerNewUserAsync(email, password, displayName) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(setAuthStatusMessage("Registering..."));
 
-        getAuth().createUserWithEmailAndPassword(email, password).then(() => {
-            // User Created. Update their DisplayName.
-            getAuth().currentUser.updateProfile({ displayName: displayName }).then( () => {
-                // Complete
-                dispatch(setDisplayName(displayName));
-            }).catch(error => {
-                handleFirebaseUpdateError(error, getState(), dispatch);
-            })
-            
-        }).catch(error => {
-            let message = parseFirebaseError(error);
-            dispatch(postSnackbarMessage(message, true));
+        if (displayName === "") {
+            dispatch(postSnackbarMessage("Please enter a display name", true, 'negative-notification'));
             dispatch(setIsLoggingInFlag(false));
             dispatch(setAuthStatusMessage(""));
-        })
+        }
+
+        else {
+            // Save the users details so they can be pushed to the Directory once they are logged in. This is because we can't set
+            // a cloud function trigger to watch for a profile update, we also can't provide the display name along with the
+            // createUserWithEmailAndPassword function, so this is the current best way to set a directory entry without concurrency
+            // issues.
+            newUser = { email: email, displayName: displayName };
+
+            getAuth().createUserWithEmailAndPassword(email, password).then(() => {
+                // User Created. Push their desired Display name to Authentication.
+                getAuth().currentUser.updateProfile({ displayName: displayName }).then( () => {
+                    dispatch(setDisplayName(displayName));
+
+                }).catch(error => {
+                    handleFirebaseUpdateError(error, getState(), dispatch);
+                    newUser = null;
+                })
+
+
+            }).catch(error => {
+                handleAuthError(dispatch, error);
+                dispatch(setIsLoggingInFlag(false));
+                dispatch(setAuthStatusMessage(""));
+            })
+        }
     }
 }
 
@@ -520,41 +588,37 @@ export function acceptProjectInviteAsync(projectId) {
 
         }).catch(error => {
             var message = `An Error occured, are you sure you are connected to the internet? Error Message : ${error.message}`; 
-            dispatch(postSnackbarMessage(message, false));
+            dispatch(postSnackbarMessage(message, true, 'infomation' ));
             removeUpdatingInviteId(dispatch, getState, projectId);
         })
     }
 }
 
-function addUpdatingInviteId(dispatch, getState, projectId) {
-    var inviteIds = getState().updatingInviteIds;
-    inviteIds[projectId] = projectId;
-    dispatch(setUpdatingInviteIds(inviteIds));
-}
-
-function removeUpdatingInviteId(dispatch, getState, projectId) {
-    var inviteIds = getState().updatingInviteIds;
-    if (inviteIds.hasOwnProperty(projectId)) {
-        delete inviteIds[projectId];
-    }
-
-    dispatch(setUpdatingInviteIds(inviteIds));
-}
-
 export function denyProjectInviteAsync(projectId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        var inviteRef = getFirestore().collection(USERS).doc(getUserUid()).collection(INVITES).doc(projectId);
+        addUpdatingInviteId(dispatch, getState, projectId);
+        
+        // Success.
+        var denyProjectInvite = getFunctions().httpsCallable('denyProjectInvite');
+        denyProjectInvite({projectId: projectId}).then( result => {
+            if (result.data.status === 'error') {
+                dispatch(postSnackbarMessage(result.data.message, false, 'error'));
+                removeUpdatingInviteId(dispatch, getState, projectId);
+            }
 
-        inviteRef.delete().then(() => {
-            // Success.
-            var denyProjectInvite = getFunctions().httpsCallable('denyProjectInvite');
-            denyProjectInvite({projectId: projectId}).then( result => {
-                if (result.data.status === 'error') {
-                    dispatch(postSnackbarMessage(result.data.message, false));
-                }
-            })
+            else {
+                // Success.
+                var inviteRef = getFirestore().collection(USERS).doc(getUserUid()).collection(INVITES).doc(projectId);
+                inviteRef.delete().then(() => {
+                    removeUpdatingInviteId(dispatch, getState, projectId);
+                }).catch(error => {
+                    dispatch(handleFirebaseUpdateError(error, getState(), dispatch));
+                })
+            }
         }).catch(error => {
-            dispatch(handleFirebaseUpdateError(error, getState(), dispatch));
+            var message = `An Error occured, are you sure you are connected to the internet? Error Message : ${error.message}`; 
+            dispatch(postSnackbarMessage(message, true, 'infomation'));
+            removeUpdatingInviteId(dispatch, getState, projectId);
         })
     }
 }
@@ -654,6 +718,10 @@ export function unsubscribeFromRemoteProjectAsync(projectId) {
             return item.uid !== projectId;
         })
         dispatch(receiveRemoteProjects(remoteProjects));
+
+        // Members.
+        var membersUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).collection(MEMBERS).onSnapshot(snapshot => {})
+        membersUnsubscribe();
         
         // TaskLists.
         var taskListsUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).collection(TASKLISTS).onSnapshot(snapshot => {})
@@ -688,6 +756,7 @@ export function migrateProjectBackToLocalAsync(projectId, projectName) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(setIsShareMenuWaiting(true));
         dispatch(setShareMenuMessage("Migrating project."))
+        dispatch(selectProject(-1));
 
         var kickAllUsersFromProject = getFunctions().httpsCallable('kickAllUsersFromProject');
         kickAllUsersFromProject({projectId: projectId}).then(result => {
@@ -699,20 +768,20 @@ export function migrateProjectBackToLocalAsync(projectId, projectName) {
                     dispatch(setIsShareMenuWaiting(false));
                     dispatch(setShareMenuMessage(""));
                 }).catch(error => {
-                    dispatch(postSnackbarMessage(error.message, false));
+                    dispatch(postSnackbarMessage(error.message, false, 'error'));
                     dispatch(setIsShareMenuWaiting(false));
                     dispatch(setShareMenuMessage(""));
                 })
             }
 
             if (result.data.status === 'error') {
-                dispatch(postSnackbarMessage(result.data.message, false));
+                dispatch(postSnackbarMessage(result.data.message, false, 'error'));
                 dispatch(setIsShareMenuWaiting(false));
                 dispatch(setShareMenuMessage(""));
             }
         }).catch(error => {
             var message = `An Error occured, are you sure you are connected to the internet? Error Message : ${error.message}`;
-            dispatch(postSnackbarMessage(message, false));
+            dispatch(postSnackbarMessage(message, false, 'infomation'));
             dispatch(setIsShareMenuWaiting(false));
             dispatch(setShareMenuMessage(""));
         })
@@ -723,8 +792,8 @@ function moveProjectToLocalLocationAsync(getFirestore, projectId, projectName) {
     return new Promise((resolve, reject) => {
         // Transfer Project to Local Location.
         var remoteRef = getFirestore().collection(REMOTES).doc(projectId);
-        var targetBatch = getFirestore().batch();
-        var sourceBatch = getFirestore().batch();
+        var targetBatch = new FirestoreBatchPaginator(getFirestore());
+        var sourceBatch = new FirestoreBatchPaginator(getFirestore());
         var requests = [];
 
         // Top Level Project Data.
@@ -819,7 +888,7 @@ export function inviteUserToProjectAsync(projectName, targetEmail, sourceEmail, 
                     var sendProjectInvite = getFunctions().httpsCallable('sendProjectInvite');
                     sendProjectInvite(inviteData).then(result => {
                         if (result.data.status === 'complete') {
-                            dispatch(postSnackbarMessage("Invite sent.", true));
+                            dispatch(postSnackbarMessage("Invite sent.", true, 'affirmative-notification'));
                             dispatch(setIsShareMenuWaiting(false));
                             dispatch(setShareMenuMessage(""));
                             dispatch(setShareMenuSubMessage(""));
@@ -828,7 +897,7 @@ export function inviteUserToProjectAsync(projectName, targetEmail, sourceEmail, 
                         }
 
                         else {
-                            dispatch(postSnackbarMessage(result.data.error));
+                            dispatch(postSnackbarMessage(result.data.error, false, 'error'));
                             dispatch(setIsShareMenuWaiting(false));
                             dispatch(setShareMenuMessage(""));
                             dispatch(setShareMenuSubMessage(""));
@@ -840,7 +909,7 @@ export function inviteUserToProjectAsync(projectName, targetEmail, sourceEmail, 
 
             else {
                 // User not Found.
-                dispatch(postSnackbarMessage('User not Found.', true));
+                dispatch(postSnackbarMessage('User not Found.', true, 'negative-notification'));
                 dispatch(setIsShareMenuWaiting(false));
                 dispatch(setShareMenuMessage(""));
                 dispatch(setShareMenuSubMessage(""));
@@ -850,7 +919,7 @@ export function inviteUserToProjectAsync(projectName, targetEmail, sourceEmail, 
             dispatch(setIsShareMenuWaiting(false));
             dispatch(setShareMenuMessage(''));
             var message = `An Error occured, are you sure you are connected to the internet? Error Message : ${error.message}`;
-            dispatch(postSnackbarMessage(message, false));
+            dispatch(postSnackbarMessage(message, false, 'infomation'));
             dispatch(setShareMenuMessage(""));
             dispatch(setShareMenuSubMessage(""));
             clearTimeout(slowMessageTimer);
@@ -861,24 +930,31 @@ export function inviteUserToProjectAsync(projectName, targetEmail, sourceEmail, 
 
 export function updateMemberRoleAsync(userId, projectId, newRole) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        dispatch(setUpdatingUserId(userId));
+        addUpdatingUserId(dispatch, getState, userId, projectId);
 
         var memberRef = getFirestore().collection(REMOTES).doc(projectId).collection(MEMBERS).doc(userId);
         memberRef.update({ role: newRole }).then( () => {
-            dispatch(setUpdatingUserId(-1));
+            removeUpdatingUserId(dispatch, getState, userId, projectId);
         }).catch(error => {
             handleFirebaseUpdateError(error, getState(), dispatch);
+            removeUpdatingUserId(dispatch, getState, userId, projectId);
         })
     }
 }
 
+
+
 export function kickUserFromProjectAsync(projectId, userId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        dispatch(setUpdatingUserId(userId));
+        addUpdatingUserId(dispatch, getState, userId, projectId);
 
         var kickUserFromProject = getFunctions().httpsCallable('kickUserFromProject');
         kickUserFromProject({userId: userId, projectId: projectId}).then( result => {
-            dispatch(setUpdatingUserId(-1));
+            removeUpdatingUserId(dispatch, getState, userId, projectId);
+        }).catch(error => {
+            var message = "Something went wrong when kicking a user: " + error.message;
+            dispatch(postSnackbarMessage(message, false, 'error'));
+            removeUpdatingUserId(dispatch, getState, userId, projectId);
         })
     }
 }
@@ -890,15 +966,16 @@ function maybeMigrateProjectAsync(dispatch, getFirestore, getState, projectId, p
     return new Promise((resolve, reject) => {
         if (!isProjectRemote(getState, projectId)) {
             // Migrate project to 'remotes' collection.
+            dispatch(selectProject(-1));
             dispatch(setShareMenuMessage('Migrating Project...'));
             dispatch(unsubscribeFromDatabaseAsync(projectId));
 
             moveProjectToRemoteLocationAsync(getFirestore, getState, projectId, projectName).then(() => {
                 dispatch(subscribeToDatabaseAsync())
-
+                dispatch(selectProject(projectId));
                 resolve();
             }).catch(error => {
-                dispatch(postSnackbarMessage(error.message, false));
+                dispatch(postSnackbarMessage(error.message, false, 'error'));
                 
                 reject();
             })
@@ -915,8 +992,8 @@ function moveProjectToRemoteLocationAsync(getFirestore, getState, projectId, pro
     return new Promise((resolve, reject) => {
         // Transfer Project.
         var userRef = getFirestore().collection(USERS).doc(getUserUid());
-        var targetBatch = getFirestore().batch();
-        var sourceBatch = getFirestore().batch();
+        var targetBatch = new FirestoreBatchPaginator(getFirestore());
+        var sourceBatch = new FirestoreBatchPaginator(getFirestore());
         var requests = [];
 
         // Top Level Project Data.
@@ -983,6 +1060,21 @@ export function attachAuthListenerAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         getAuth().onAuthStateChanged(user => {
             if (user) {
+
+                if (newUser !== null) {
+                    console.log(newUser);
+                    // A new user has just registered. Make a directory listing for them.
+                    var ref = getFirestore().collection(DIRECTORY).doc(newUser.email);
+                    ref.set(Object.assign({}, new DirectoryStore(newUser.email, newUser.displayName, user.uid))).then(() => {
+                        // Complete.
+                        newUser = null;
+                    }).catch(error => {
+                        var message = `Critical error while setting directory listing, please contact the developer. Error : ${error.code}
+                         ${error.message}`;
+                        dispatch(postSnackbarMessage(message, false, 'error'));
+                    });
+                }
+                
                 // User is Logged in.
                 setUserUid(user.uid);
                 dispatch(subscribeToDatabaseAsync());
@@ -998,7 +1090,7 @@ export function attachAuthListenerAsync() {
                 // and no action is required.
                 if (getUserUid() !== "") {
                     dispatch(setAuthStatusMessage("Logged out"));
-                    dispatch(unsubscribeFromDatabaseAsync());
+                    //dispatch(unsubscribeFromDatabaseAsync());
                     dispatch(setIsLoggedInFlag(false));
                     dispatch(setUserEmail(""));
                     dispatch(setDisplayName(""));
@@ -1078,12 +1170,14 @@ export function unsubscribeRemoteIds() {
 
 export function logOutUserAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        getAuth().signOut().then( () => {
-            
+        unsubscribeFromDatabaseAsync();
+
+        getAuth().signOut().then(() => {
+
         }).catch(error => {
-            let message = parseFirebaseError(error);
-            dispatch(postSnackbarMessage(message, false));
-            
+            let message = handleAuthError(error);
+            dispatch(postSnackbarMessage(message, false, 'error'));
+
         })
     }
 }
@@ -1096,16 +1190,14 @@ export function logInUserAsync(email,password) {
         // Set Persistence.
         getAuth().setPersistence('local').then(() => {
             getAuth().signInWithEmailAndPassword(email, password).catch(error => {
-                let message = parseFirebaseError(error);
-                dispatch(postSnackbarMessage(message, true));
+                handleAuthError(dispatch, error);
                 dispatch(setIsLoggingInFlag(false));
                 dispatch(setAuthStatusMessage("Logged out"));
             })
         }).catch(error => {
-            let message = parseFirebaseError(error);
-            dispatch(postSnackbarMessage(message, true));
+            handleAuthError(dispatch, error);
             dispatch(setIsLoggingInFlag(false));
-            dispatch(setAuthStatusMessage="Logged Out");
+            dispatch(setAuthStatusMessage("Logged Out"));
         })
 
 
@@ -1220,7 +1312,7 @@ export function purgeCompleteTasksAsync() {
 
             // Delete those Tasks.
             // Build Batch.
-            var batch = getFirestore().batch();
+            var batch = new FirestoreBatchPaginator(getFirestore());
             completedTaskIds.forEach(taskId => {
                 batch.delete(getFirestore().collection(TASKS).doc(taskId));
             })
@@ -1390,6 +1482,7 @@ export function removeTaskListAsync(taskListWidgetId) {
 
 export function updateProjectNameAsync(projectId, newValue) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(setOpenProjectSelectorId(-1));
         // Update Firestore.
         var projectRef = getProjectRef(getFirestore, getState, projectId);
         projectRef.update({ projectName: newValue }).then(() => {
@@ -1403,6 +1496,7 @@ export function updateProjectNameAsync(projectId, newValue) {
 export function removeProjectAsync(projectId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (getState.selectedProjectId !== -1) {
+            dispatch(selectProject(-1));
             // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
             // been loaded in via the handleProjectSelectorClick method. No point in querying Firebase again for this data.
             var taskListIds = getState().taskLists.filter(item => {
@@ -1412,33 +1506,18 @@ export function removeProjectAsync(projectId) {
             var taskIds = collectProjectRelatedTaskIds(getState().tasks, projectId);
 
             // Build Updates.
-            var batch = getFirestore().batch();
+            var batch = new FirestoreBatchPaginator(getFirestore());
 
-            // Remote.
-            if (isProjectRemote(getState, projectId)) {
-                // TaskLists.
-                taskListIds.forEach(id => {
-                    batch.delete(getFirestore().collection(REMOTES).doc(projectId).collection(TASKLISTS).doc(id));
-                })
-
-                // Tasks
-                taskIds.forEach(id => {
-                    batch.delete(getFirestore().collection(REMOTES).doc(projectId).collection(TASKS).doc(id));
-                })
-            }
-            
             // Local
-            else {
-                // TaskLists.
-                taskListIds.forEach(id => {
-                    batch.delete(getFirestore().collection(USERS).doc(getUserUid()).collection(TASKLISTS).doc(id));
-                })
+            // TaskLists.
+            taskListIds.forEach(id => {
+                batch.delete(getFirestore().collection(USERS).doc(getUserUid()).collection(TASKLISTS).doc(id));
+            })
 
-                // Tasks
-                taskIds.forEach(id => {
-                    batch.delete(getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).doc(id));
-                })
-            }
+            // Tasks
+            taskIds.forEach(id => {
+                batch.delete(getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).doc(id));
+            })
             
             // Project Layout
             var projectLayoutId = projectId;
@@ -1464,58 +1543,69 @@ export function removeRemoteProjectAsync(projectId) {
         if (projectId !== -1 && isProjectRemote(getState, projectId)) {
             dispatch(setIsShareMenuWaiting(true));
             dispatch(setShareMenuMessage("Deleting Project"));
+            dispatch(selectProject(-1));
 
             var removeRemoteProject = getFunctions().httpsCallable('removeRemoteProject');
             removeRemoteProject({projectId: projectId}).then(result => {
                 if (result.data.status === 'complete') {
-                    dispatch(selectProject(-1));
                     dispatch(setIsShareMenuOpen(false));
                     dispatch(setIsShareMenuWaiting(false));
                     dispatch(setShareMenuMessage(""));
-
                 }
 
                 if (result.data.status === 'error') {
-                    dispatch(postSnackbarMessage(result.data.message));
+                    dispatch(postSnackbarMessage(result.data.message, false, 'error'));
                     dispatch(setIsShareMenuWaiting(false));
                     dispatch(setShareMenuMessage(""));
                 }
             }).catch(error => {
                 var message = `An Error occured, are you sure you are connected to the internet? Error Message : ${error.message}`; 
-                dispatch(postSnackbarMessage(message, false));
+                dispatch(postSnackbarMessage(message, true, 'infomation'));
                 dispatch(setIsShareMenuWaiting(false));
                 dispatch(setShareMenuMessage(""));
             }) 
         }
+
+        else {
+            var message = "No project selected or project is not a shared project."
+            dispatch(postSnackbarMessage(message, true, 'infomation'));
+        }
     }
 }
 
-
 export function addNewProjectAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        // Update Firestore.    
-        var newProjectName = "New Project";
-        var batch = getFirestore().batch();
+        if (getState().isLoggedIn === true) {
+            // Update Firestore.    
+            var newProjectName = "";
+            var batch = getFirestore().batch();
 
-        // Project.
-        var newProjectRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).doc();
-        var newProjectKey = newProjectRef.id;
+            // Project.
+            var newProjectRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).doc();
+            var newProjectKey = newProjectRef.id;
 
-        var newProject = new ProjectStore(newProjectName, newProjectKey, false);
-        batch.set(newProjectRef, Object.assign({}, newProject));
+            var newProject = new ProjectStore(newProjectName, newProjectKey, false);
+            batch.set(newProjectRef, Object.assign({}, newProject));
 
-        // Layout
-        var newLayoutRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTLAYOUTS).doc(newProjectKey);
+            // Layout
+            var newLayoutRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTLAYOUTS).doc(newProjectKey);
 
-        var newProjectLayout = new ProjectLayoutStore([], newProjectKey, newProjectKey);
-        batch.set(newLayoutRef, Object.assign({}, newProjectLayout));
+            var newProjectLayout = new ProjectLayoutStore([], newProjectKey, newProjectKey);
+            batch.set(newLayoutRef, Object.assign({}, newProjectLayout));
 
-        // Execute Additions.
-        batch.commit().then(() => {
-            // Carefull what you do here, promises don't resolve if you are offline.
-        }).catch(error => {
-            handleFirebaseUpdateError(error, getState(), dispatch);
-        })
+            // Selections.
+            dispatch(selectProject(newProjectKey));
+            dispatch(setOpenProjectSelectorId(newProjectKey));
+
+
+            // Execute Additions.
+            batch.commit().then(() => {
+                // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            })
+        }
+
     }
 }
 
@@ -1571,9 +1661,8 @@ export function updateTaskNameAsync(taskListWidgetId, taskId, newData, currentMe
         }
 
         // Returns a new Update Object with arguments parsed in (if any);
-        var newUpdate = parseArgumentsIntoUpdate(update);
-
-
+        var newUpdate = parseArgumentsIntoUpdate(getState, update);
+        
         // Update Firestore.
         var taskRef = getTaskRef(getFirestore, getState, taskId);
         taskRef.update(newUpdate).then(() => {
@@ -1589,30 +1678,55 @@ export function removeSelectedTaskAsync() {
 
         var taskId = getState().selectedTask.taskId;
         if (taskId !== -1) {
-            // Update Firestore.    
-            // Build Batch and Execute.
-            var batch = getFirestore().batch();
-            var taskRef = getTaskRef(getFirestore, getState, taskId);
-            batch.delete(taskRef);
-
-            batch.commit().then(() => {
-                // Carefull what you do here, promises don't resolve if you are offline.
+            deleteTaskAsync(getFirestore, getState, taskId).then( () => {
+                // Careful what you do here. Promises don't resolve Offline.
             }).catch(error => {
                 handleFirebaseUpdateError(error, getState(), dispatch);
-            });
+            })
+            dispatch(selectTask(getState().focusedTaskListId, -1, false));
+        }
+    }
+}
 
+export function removeTaskAsync(taskId) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        if (taskId !== -1) {
+            deleteTaskAsync(getFirestore, getState, taskId).then( () => {
+                // Careful what you do here. Promises don't resolve Offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            })
             dispatch(selectTask(getState().focusedTaskListId, -1, false));
         }
     }
 }
 
 
+function deleteTaskAsync(getFirestore, getState, taskId) {
+    return new Promise((resolve, reject) => {
+        // Update Firestore.    
+        // Build Batch and Execute.
+        var batch = getFirestore().batch();
+        var taskRef = getTaskRef(getFirestore, getState, taskId);
+        batch.delete(taskRef);
+
+        batch.commit().then(() => {
+            resolve();
+        }).catch(error => {
+            reject(error);
+        });
+    })
+}
+
 export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-
+        dispatch(setOpenTaskListWidgetHeaderId(-1));
         var taskListRef = getTaskListRef(getFirestore, getState, taskListWidgetId);
 
-        taskListRef.update({ taskListName: newName }).then(() => {
+        taskListRef.update({
+             taskListName: newName,
+             isFresh: false,
+             }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(error => {
             handleFirebaseUpdateError(error, getState(), dispatch);
@@ -1678,6 +1792,7 @@ export function addNewTaskAsync() {
                     true,
                     false,
                     Object.assign({},metadata),
+                    -1,
                 )
 
                 newTaskRef.set(Object.assign({}, newTask)).then(() => {
@@ -1695,7 +1810,6 @@ export function addNewTaskAsync() {
 export function addNewTaskListAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(startTasklistAdd());
-
         var selectedProjectId = getState().selectedProjectId;
 
         if (selectedProjectId !== -1) {
@@ -1711,12 +1825,16 @@ export function addNewTaskListAsync() {
             }
 
             var newTaskList = new TaskListStore(
-                "New Task List",
+                "",
                 selectedProjectId,
                 newTaskListRef.id,
                 newTaskListRef.id,
-                Object.assign({}, new TaskListSettingsStore(true, "completed"))
+                Object.assign({}, new TaskListSettingsStore(true, "completed")),
+                true,
             )
+
+            dispatch(changeFocusedTaskList(newTaskListRef.id));
+            dispatch(setOpenTaskListWidgetHeaderId(newTaskListRef.id));
 
             newTaskListRef.set(Object.assign({}, newTaskList)).then(() => {
                 // Carefull what you do here, promises don't resolve if you are offline.
@@ -1946,6 +2064,64 @@ export function unsubscribeProjectLayoutsAsync(projectId) {
 }
 
 // Helper Functions.
+function addUpdatingInviteId(dispatch, getState, inviteId) {
+    var oldUpdatingInviteIds = getState().updatingInviteIds;
+
+
+    if (oldUpdatingInviteIds.includes(inviteId) === false) {
+        var newUpdatingInviteIds = [...oldUpdatingInviteIds];
+        newUpdatingInviteIds.push(inviteId);
+        dispatch(setUpdatingInviteIds(newUpdatingInviteIds));
+    }
+    
+}
+
+function removeUpdatingInviteId(dispatch, getState, inviteId) {
+    var oldUpdatingInviteIds = getState().updatingInviteIds;
+    var newUpdatingInviteIds = [];
+
+    var index = oldUpdatingInviteIds.findIndex(id => {
+        return id === inviteId;
+    })
+
+    if (index !== -1) {
+        newUpdatingInviteIds = [...oldUpdatingInviteIds];
+        newUpdatingInviteIds.splice(index, 1);
+        dispatch(setUpdatingInviteIds(newUpdatingInviteIds));
+    }
+}
+
+function addUpdatingUserId(dispatch, getState, userId, projectId) {
+    var oldUpdatingUserIds = getState().updatingUserIds;
+    var newUpdatingUserIds = [];
+    var alreadyExists = oldUpdatingUserIds.some(item => {
+        return item.projectId === projectId && item.userId === userId;
+    })
+
+    if (!alreadyExists) {
+        newUpdatingUserIds = [...oldUpdatingUserIds];
+        newUpdatingUserIds.push({projectId: projectId, userId: userId});
+        dispatch(setUpdatingUserIds(newUpdatingUserIds));
+    }
+    
+}
+
+function removeUpdatingUserId(dispatch, getState, userId, projectId) {
+    var oldUpdatingUserIds = getState().updatingUserIds;
+    var newUpdatingUserIds = [];
+
+    var index = oldUpdatingUserIds.findIndex(item => {
+        return item.projectId === projectId && item.userId === userId;
+    })
+
+    if (index !== -1) {
+        newUpdatingUserIds = [...oldUpdatingUserIds];
+        newUpdatingUserIds.splice(index, 1);
+
+        dispatch(setUpdatingUserIds(newUpdatingUserIds));
+    }
+}
+
 // Determine if an update to the Metadata should occur. Updates should be ignored for a set ammount of time after a Task is
 // created to stop CreatedAt and UpdatedAt times being the same or very similiar.
 function shouldUpdateMetadata(currentMetadata) {
@@ -2041,7 +2217,7 @@ function handleFirebaseSnapshotError(error, state, dispatch) {
     switch (error.code) {
         case "permission-denied":
             if (state.isLoggedIn) {
-                dispatch(postSnackbarMessage(error.message, false))
+                dispatch(postSnackbarMessage(error.message, false, 'error'))
             }
             
             // No handling required if logged out. Expected behaviour.
@@ -2055,13 +2231,12 @@ function handleFirebaseUpdateError(error, state, dispatch) {
     switch (error.code) {
         case "permission-denied":
             if (state.isLoggedIn) {
-                let message = parseFirebaseError(error);
-                dispatch(postSnackbarMessage(message, false));
+                dispatch(postSnackbarMessage(`${error.code} : ${error.message}`, false, 'error'));
             }
 
             else {
                 let message = "You must log in first.";
-                dispatch(postSnackbarMessage(message, true));
+                dispatch(postSnackbarMessage(message, true, 'infomation'));
             }
 
         default:
@@ -2071,12 +2246,44 @@ function handleFirebaseUpdateError(error, state, dispatch) {
 }
 
 
-function parseFirebaseError(error) {
-    return "Firebase Error: " + error.code + " " + error.message;
+function handleAuthError(dispatch, error) {
+    switch (error.code) {
+        case "auth/wrong-password":
+            dispatch(postSnackbarMessage("Incorrect password", true, 'negative-notification'))
+            break;
+
+        case "auth/no-user-found":
+            dispatch(postSnackbarMessage("No user matching that email was found", true, 'negative-notification'));
+            break;
+
+        case "auth/invalid-email":
+            dispatch(postSnackbarMessage("The email you have entered is invalid", true, 'negative-notification'));
+            break;
+
+        case "auth/network-request-failed":
+            dispatch(postSnackbarMessage("Cannot reach the authentication servers, are you sure you have an internet connection?", true, 'negative-notification'));
+            break;
+
+        case "auth/email-already-in-use":
+            dispatch(postSnackbarMessage("A user with that email is already registered", true, 'negative-notification'));
+            break;
+
+        case "auth/weak-password":
+            dispatch(postSnackbarMessage("Password to weak, must be longer than 6 characters", true, 'negative-notification'));
+            break;
+        
+        case "auth/user-disabled":
+            dispatch(postSnackbarMessage("Sorry, your account has been disabled by the developer.", true, 'negative-notification'));
+            break;
+        
+        default:
+            console.log("Hitting Default");
+            dispatch(postSnackbarMessage(`${error.code} : ${error.message}`, false, 'error'));
+    }
 }
 
 
-function parseArgumentsIntoUpdate(update) {
+function parseArgumentsIntoUpdate(getState, update) {
     // stringArgv() will remove single apostraphes, replace them with a \ for now, we will put the apostraphes back in later.
     var taskName = update.taskName.replace(/'/g, "\\");
 
@@ -2098,11 +2305,80 @@ function parseArgumentsIntoUpdate(update) {
         parsedUpdate.isHighPriority = true;
     }
 
+    if (argv.i !== undefined) {
+        parsedUpdate.isHighPriority = true;
+    }
+
+    // Assign Task to.
+    if (argv.a !== undefined) {
+        if (argv.a === true) {
+            // Clear AssignedTo.
+            parsedUpdate.assignedTo = -1;
+        }
+
+        else if (argv.a !== null && argv.a.trim() !== "") {
+            // Fuzzy search for a userId.
+            var userId = fuzzyMatchUserId(getState, argv.a);
+            if (userId !== undefined && userId !== -1) {
+                // Match found.
+                parsedUpdate.assignedTo = userId;
+            }
+        }
+    }
+
     // Use text ignored by parseArgs to rebuild taskName,
     // but first put the apostraphes you removed earlier back into the string.
     parsedUpdate.taskName = (argv._.join(" ")).replace(/\\/g, "'");
 
+    // Override with Lorem Ipsum Text.
+    if (argv.l !== undefined) {
+        if (argv.l === true) {
+            parsedUpdate.taskName = loremIpsum({count: 1, random: Math.random});
+        }
+
+        else {
+            parsedUpdate.taskName = loremIpsum({count: argv.l, random: Math.random});
+        }
+    }
+
     return parsedUpdate;
+}
+
+function fuzzyMatchUserId(getState, entry) {
+    // Fuzzy search through members for a match.
+    var selectedProjectId = getState().selectedProjectId;    
+    var filteredMembers = getState().members.filter(item => {
+        return item.project === selectedProjectId;
+    })
+
+    // Add some entries for user typing 'me' or 'myself'.. and irene.
+    filteredMembers.push({ displayName: 'me', userId: getUserUid() });
+    filteredMembers.push({ displayName: 'myself', userId: getUserUid() });
+
+    var options = {
+        shouldSort: true,
+        includeScore: true,
+        threshold: 0.6,
+        location: 0,
+        distance: 100,
+        maxPatternLength: 16,
+        minMatchCharLength: 1,
+        keys: [
+          "displayName"
+      ]
+      };
+
+      var fuse = new Fuse(filteredMembers, options);
+      var result = fuse.search(entry);
+
+      if (result.length === 0) {
+          // No Result Found.
+          return -1;
+      }
+
+      else {
+          return result[0].item.userId;
+      }
 }
 
 function parseDateArgument(d) {
