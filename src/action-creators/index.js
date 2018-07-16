@@ -1062,7 +1062,6 @@ export function attachAuthListenerAsync() {
             if (user) {
 
                 if (newUser !== null) {
-                    console.log(newUser);
                     // A new user has just registered. Make a directory listing for them.
                     var ref = getFirestore().collection(DIRECTORY).doc(newUser.email);
                     ref.set(Object.assign({}, new DirectoryStore(newUser.email, newUser.displayName, user.uid))).then(() => {
@@ -2277,7 +2276,6 @@ function handleAuthError(dispatch, error) {
             break;
         
         default:
-            console.log("Hitting Default");
             dispatch(postSnackbarMessage(`${error.code} : ${error.message}`, false, 'error'));
     }
 }
