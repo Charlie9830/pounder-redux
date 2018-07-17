@@ -598,6 +598,9 @@ export function appReducer(state, action) {
             return {
                 ...state,
                 showOnlySelfTasks: action.value,
+                openTaskOptionsId: -1,
+                selectedTask: {taskListWidgetId: -1, taskId: -1, isInputOpen: false, isMetadataOpen: false},
+                
             }
         }
 

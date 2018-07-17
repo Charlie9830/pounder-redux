@@ -565,7 +565,10 @@ function appReducer(state, action) {
         case ActionTypes.SET_SHOW_ONLY_SELF_TASKS:
             {
                 return _extends({}, state, {
-                    showOnlySelfTasks: action.value
+                    showOnlySelfTasks: action.value,
+                    openTaskOptionsId: -1,
+                    selectedTask: { taskListWidgetId: -1, taskId: -1, isInputOpen: false, isMetadataOpen: false }
+
                 });
             }
 
