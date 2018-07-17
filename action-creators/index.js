@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", {
 
 var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
 
+exports.setShowOnlySelfTasks = setShowOnlySelfTasks;
 exports.setOpenProjectSelectorId = setOpenProjectSelectorId;
 exports.setUpdatingUserIds = setUpdatingUserIds;
 exports.setOpenTaskListWidgetHeaderId = setOpenTaskListWidgetHeaderId;
@@ -179,6 +180,13 @@ var DATE_FORMAT = 'dddd MMMM Do YYYY, h:mm a';
 var newUser = null;
 
 // Standard Action Creators.
+function setShowOnlySelfTasks(newValue) {
+    return {
+        type: ActionTypes.SET_SHOW_ONLY_SELF_TASKS,
+        value: newValue
+    };
+}
+
 function setOpenProjectSelectorId(projectId) {
     return {
         type: ActionTypes.SET_OPEN_PROJECT_SELECTOR_ID,
@@ -1265,7 +1273,6 @@ function attachAuthListenerAsync() {
             if (user) {
 
                 if (newUser !== null) {
-                    console.log(newUser);
                     // A new user has just registered. Make a directory listing for them.
                     var ref = getFirestore().collection(_paths.DIRECTORY).doc(newUser.email);
                     ref.set(Object.assign({}, new _pounderStores.DirectoryStore(newUser.email, newUser.displayName, user.uid))).then(function () {
@@ -1766,6 +1773,8 @@ function removeProjectAsync(projectId) {
             getDexie = _ref33.getDexie,
             getFunctions = _ref33.getFunctions;
 
+        dispatch(setShowOnlySelfTasks(false));
+
         if (getState.selectedProjectId !== -1) {
             dispatch(selectProject(-1));
             // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
@@ -1855,6 +1864,8 @@ function addNewProjectAsync() {
             getAuth = _ref35.getAuth,
             getDexie = _ref35.getDexie,
             getFunctions = _ref35.getFunctions;
+
+        dispatch(setShowOnlySelfTasks(false));
 
         if (getState().isLoggedIn === true) {
             // Update Firestore.    
@@ -2076,6 +2087,8 @@ function addNewTaskAsync() {
             getDexie = _ref43.getDexie,
             getFunctions = _ref43.getFunctions;
 
+        dispatch(setShowOnlySelfTasks(false));
+
         if (getState().focusedTaskListId !== -1) {
             var _getState = getState(),
                 selectedProjectId = _getState.selectedProjectId,
@@ -2114,7 +2127,9 @@ function addNewTaskListAsync() {
             getDexie = _ref44.getDexie,
             getFunctions = _ref44.getFunctions;
 
+        dispatch(setShowOnlySelfTasks(false));
         dispatch(startTasklistAdd());
+
         var selectedProjectId = getState().selectedProjectId;
 
         if (selectedProjectId !== -1) {
@@ -2598,7 +2613,6 @@ function handleAuthError(dispatch, error) {
             break;
 
         default:
-            console.log("Hitting Default");
             dispatch(postSnackbarMessage(error.code + ' : ' + error.message, false, 'error'));
     }
 }

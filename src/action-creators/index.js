@@ -19,6 +19,13 @@ const DATE_FORMAT = 'dddd MMMM Do YYYY, h:mm a';
 var newUser = null;
 
 // Standard Action Creators.
+export function setShowOnlySelfTasks(newValue) {
+    return {
+        type: ActionTypes.SET_SHOW_ONLY_SELF_TASKS,
+        value: newValue,
+    }
+}
+
 export function setOpenProjectSelectorId(projectId) {
     return {
         type: ActionTypes.SET_OPEN_PROJECT_SELECTOR_ID,
@@ -1494,6 +1501,8 @@ export function updateProjectNameAsync(projectId, newValue) {
 
 export function removeProjectAsync(projectId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(setShowOnlySelfTasks(false));
+        
         if (getState.selectedProjectId !== -1) {
             dispatch(selectProject(-1));
             // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
@@ -1574,6 +1583,8 @@ export function removeRemoteProjectAsync(projectId) {
 
 export function addNewProjectAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(setShowOnlySelfTasks(false));
+
         if (getState().isLoggedIn === true) {
             // Update Firestore.    
             var newProjectName = "";
@@ -1760,6 +1771,8 @@ export function moveTaskAsync(destinationTaskListId) {
 
 export function addNewTaskAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(setShowOnlySelfTasks(false));
+
         if (getState().focusedTaskListId !== -1) {
 
             const { selectedProjectId, focusedTaskListId } = getState();
@@ -1808,7 +1821,9 @@ export function addNewTaskAsync() {
 
 export function addNewTaskListAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(setShowOnlySelfTasks(false));
         dispatch(startTasklistAdd());
+
         var selectedProjectId = getState().selectedProjectId;
 
         if (selectedProjectId !== -1) {

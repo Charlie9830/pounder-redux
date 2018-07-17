@@ -92,6 +92,7 @@ var initialState = {
     updatingUserIds: [],
     updatingInviteIds: [],
     openTaskOptionsId: -1,
+    showOnlySelfTasks: false,
 }
 
 export var appStore = createStore(

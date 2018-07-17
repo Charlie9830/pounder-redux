@@ -297,7 +297,8 @@ function appReducer(state, action) {
                 sourceTaskListId: -1,
                 focusedTaskListId: -1,
                 openTaskListSettingsMenuId: -1,
-                isTaskListJumpMenuOpen: false
+                isTaskListJumpMenuOpen: false,
+                showOnlySelfTasks: false
             });
 
         case ActionTypes.CLOSE_CALENDAR:
@@ -558,6 +559,13 @@ function appReducer(state, action) {
             {
                 return _extends({}, state, {
                     remoteProjectIds: action.value
+                });
+            }
+
+        case ActionTypes.SET_SHOW_ONLY_SELF_TASKS:
+            {
+                return _extends({}, state, {
+                    showOnlySelfTasks: action.value
                 });
             }
 
