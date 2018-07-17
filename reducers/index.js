@@ -136,14 +136,14 @@ function appReducer(state, action) {
         case ActionTypes.RECEIVE_LOCAL_PROJECTS:
             return _extends({}, state, {
                 localProjects: action.projects,
-                projects: [].concat(_toConsumableArray(action.projects), _toConsumableArray(state.remoteProjects)),
+                projects: [].concat(_toConsumableArray(action.projects.sort(projectSorter)), _toConsumableArray(state.remoteProjects)),
                 isAwaitingFirebase: false
             });
 
         case ActionTypes.RECEIVE_REMOTE_PROJECTS:
             return _extends({}, state, {
                 remoteProjects: action.projects,
-                projects: [].concat(_toConsumableArray(state.localProjects), _toConsumableArray(action.projects))
+                projects: [].concat(_toConsumableArray(state.localProjects), _toConsumableArray(action.projects.sort(projectSorter)))
             });
 
         case ActionTypes.SET_UPDATING_USER_IDS:
@@ -579,6 +579,15 @@ function appReducer(state, action) {
 }
 
 // Helper Methods.
+
+// Sort Projects alphabetically.
+function projectSorter(a, b) {
+    var textA = a.projectName.toUpperCase();
+    var textB = b.projectName.toUpperCase();
+
+    return textA < textB ? -1 : textA > textB ? 1 : 0;
+}
+
 function isFirstTimeBoot(generalConfig) {
     if (generalConfig !== undefined && generalConfig.isFirstTimeBoot !== undefined) {
         return generalConfig.isFirstTimeBoot;

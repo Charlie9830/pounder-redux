@@ -128,7 +128,7 @@ export function appReducer(state, action) {
             return {
                 ...state,
                 localProjects: action.projects,
-                projects: [...action.projects, ...state.remoteProjects],
+                projects: [...action.projects.sort(projectSorter), ...state.remoteProjects],
                 isAwaitingFirebase: false,
             }
 
@@ -136,7 +136,7 @@ export function appReducer(state, action) {
             return {
                 ...state,
                 remoteProjects: action.projects,
-                projects: [...state.localProjects, ...action.projects]
+                projects: [...state.localProjects, ...action.projects.sort(projectSorter)]
             }
             
         case ActionTypes.SET_UPDATING_USER_IDS: {
@@ -600,7 +600,7 @@ export function appReducer(state, action) {
                 showOnlySelfTasks: action.value,
                 openTaskOptionsId: -1,
                 selectedTask: {taskListWidgetId: -1, taskId: -1, isInputOpen: false, isMetadataOpen: false},
-                
+
             }
         }
 
@@ -611,6 +611,15 @@ export function appReducer(state, action) {
 }
 
 // Helper Methods.
+
+// Sort Projects alphabetically.
+function projectSorter(a,b) {
+    var textA = a.projectName.toUpperCase();
+    var textB = b.projectName.toUpperCase();
+
+    return (textA < textB) ? -1 : (textA > textB) ? 1 : 0;
+}
+
 function isFirstTimeBoot(generalConfig) {
     if (generalConfig !== undefined && generalConfig.isFirstTimeBoot !== undefined) {
         return generalConfig.isFirstTimeBoot;
