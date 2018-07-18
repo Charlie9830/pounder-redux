@@ -123,6 +123,12 @@ export function appReducer(state, action) {
                 ...state,
                 isAwaitingFirebase: true
             }
+
+        case ActionTypes.SET_FLOATING_TEXT_INPUT:
+            return {
+                ...state,
+                floatingTextInput: action.value,
+            }
         
         case ActionTypes.RECEIVE_LOCAL_PROJECTS:
             return {

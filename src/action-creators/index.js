@@ -47,6 +47,13 @@ export function setOpenTaskListWidgetHeaderId(taskListId) {
     }
 }
 
+export function setFloatingTextInput(isOpen, currentText, targetType, targetId) {
+    return {
+        type: ActionTypes.SET_FLOATING_TEXT_INPUT,
+        value: { isOpen: isOpen, currentText: currentText, targetType: targetType, targetId: targetId}
+    }
+}
+
 export function setOpenTaskOptionsId(taskId) {
     return {
         type: ActionTypes.SET_OPEN_TASK_OPTIONS_ID,
@@ -1489,6 +1496,8 @@ export function removeTaskListAsync(taskListWidgetId) {
 export function updateProjectNameAsync(projectId, newValue) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(setOpenProjectSelectorId(-1));
+        dispatch(setFloatingTextInput(false));
+
         // Update Firestore.
         var projectRef = getProjectRef(getFirestore, getState, projectId);
         projectRef.update({ projectName: newValue }).then(() => {
@@ -1502,7 +1511,7 @@ export function updateProjectNameAsync(projectId, newValue) {
 export function removeProjectAsync(projectId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(setShowOnlySelfTasks(false));
-        
+
         if (getState.selectedProjectId !== -1) {
             dispatch(selectProject(-1));
             // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
@@ -1619,6 +1628,43 @@ export function addNewProjectAsync() {
     }
 }
 
+export function addNewProjectWithNameAsync(projectName) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(setShowOnlySelfTasks(false));
+        dispatch(setFloatingTextInput(false));
+
+        if (getState().isLoggedIn === true) {
+            // Update Firestore.    
+            var newProjectName = projectName;
+            var batch = getFirestore().batch();
+
+            // Project.
+            var newProjectRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).doc();
+            var newProjectKey = newProjectRef.id;
+
+            var newProject = new ProjectStore(newProjectName, newProjectKey, false);
+            batch.set(newProjectRef, Object.assign({}, newProject));
+
+            // Layout
+            var newLayoutRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTLAYOUTS).doc(newProjectKey);
+
+            var newProjectLayout = new ProjectLayoutStore([], newProjectKey, newProjectKey);
+            batch.set(newLayoutRef, Object.assign({}, newProjectLayout));
+
+            // Selections.
+            dispatch(selectProject(newProjectKey));
+
+            // Execute Additions.
+            batch.commit().then(() => {
+                // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            })
+        }
+
+    }
+}
+
 export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue, currentMetadata) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (getState().selectedTask.taskListWidgetId !== taskListWidgetId &&
@@ -1663,6 +1709,7 @@ export function updateProjectLayoutAsync(layouts, projectId) {
 export function updateTaskNameAsync(taskListWidgetId, taskId, newData, currentMetadata) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(closeTask(taskListWidgetId, taskId));
+        dispatch(setFloatingTextInput(false));
 
         var update = {
             taskName: newData,
@@ -1731,6 +1778,8 @@ function deleteTaskAsync(getFirestore, getState, taskId) {
 export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(setOpenTaskListWidgetHeaderId(-1));
+        dispatch(setFloatingTextInput(false));
+
         var taskListRef = getTaskListRef(getFirestore, getState, taskListWidgetId);
 
         taskListRef.update({
@@ -1819,6 +1868,69 @@ export function addNewTaskAsync() {
     }
 }
 
+export function addNewTaskWithNameAsync(taskName) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(setShowOnlySelfTasks(false));
+
+        const { selectedProjectId, focusedTaskListId } = getState();
+
+        if (selectedProjectId !== -1 && focusedTaskListId !== -1) {
+            // Add a new Task.
+            dispatch(startTaskAdd());
+            dispatch(setFloatingTextInput(false));
+            dispatch(closeTask(focusedTaskListId, newTaskKey)); // Close the Task Input for brevity. Even though
+            // technically we don't use this in Mobile.
+
+            var newTaskRef;
+            if (isProjectRemote(getState, getState().selectedProjectId)) {
+                newTaskRef = getFirestore().collection(REMOTES).doc(getState().selectedProjectId).collection(TASKS).doc();
+            }
+
+            else {
+                newTaskRef = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).doc();
+            }
+
+            var metadata = new TaskMetadataStore(getState().displayName, getHumanFriendlyDate(new Date()), "", "", "");
+
+            
+            // Parse Arguments into an Update Object.
+            var parsedUpdate = parseArgumentsIntoUpdate(getState, { 
+                taskName: taskName,
+                dueDate: "",
+                isHighPriority: false
+            });
+
+            var parsedTaskName = parsedUpdate.taskName;
+            var parsedDueDate = parsedUpdate.dueDate;
+            var parsedPriority = parsedUpdate.isHighPriority;
+
+
+            var newTaskKey = newTaskRef.id;
+            var newTask = new TaskStore(
+                parsedTaskName,
+                parsedDueDate,
+                false,
+                selectedProjectId,
+                focusedTaskListId,
+                newTaskKey,
+                new Moment().toISOString(),
+                true,
+                parsedPriority,
+                Object.assign({}, metadata),
+                -1,
+            )
+
+            newTaskRef.set(Object.assign({}, newTask)).then(() => {
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            })
+
+            dispatch(selectTask(focusedTaskListId, newTaskKey, false));
+
+        }
+    }
+}
+
 export function addNewTaskListAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(setShowOnlySelfTasks(false));
@@ -1849,6 +1961,46 @@ export function addNewTaskListAsync() {
 
             dispatch(changeFocusedTaskList(newTaskListRef.id));
             dispatch(setOpenTaskListWidgetHeaderId(newTaskListRef.id));
+
+            newTaskListRef.set(Object.assign({}, newTaskList)).then(() => {
+                // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            })
+        }
+    }
+}
+
+export function addNewTaskListWithNameAsync(taskListName) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        dispatch(setShowOnlySelfTasks(false));
+        dispatch(startTasklistAdd());
+        dispatch(setFloatingTextInput(false));
+
+        var selectedProjectId = getState().selectedProjectId;
+
+        if (selectedProjectId !== -1) {
+            // Add to Firestore.
+            var newTaskListRef;
+
+            if (isProjectRemote(getState, selectedProjectId)) {
+                newTaskListRef = getFirestore().collection(REMOTES).doc(selectedProjectId).collection(TASKLISTS).doc();
+            }
+            
+            else {
+                newTaskListRef = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKLISTS).doc();
+            }
+
+            var newTaskList = new TaskListStore(
+                taskListName,
+                selectedProjectId,
+                newTaskListRef.id,
+                newTaskListRef.id,
+                Object.assign({}, new TaskListSettingsStore(true, "completed")),
+                true,
+            )
+
+            dispatch(changeFocusedTaskList(newTaskListRef.id));
 
             newTaskListRef.set(Object.assign({}, newTaskList)).then(() => {
                 // Carefull what you do here, promises don't resolve if you are offline.

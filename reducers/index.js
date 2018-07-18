@@ -133,6 +133,11 @@ function appReducer(state, action) {
                 isAwaitingFirebase: true
             });
 
+        case ActionTypes.SET_FLOATING_TEXT_INPUT:
+            return _extends({}, state, {
+                floatingTextInput: action.value
+            });
+
         case ActionTypes.RECEIVE_LOCAL_PROJECTS:
             return _extends({}, state, {
                 localProjects: action.projects,
