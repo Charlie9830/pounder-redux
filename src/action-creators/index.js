@@ -1691,17 +1691,32 @@ export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue, curr
     }
 }
 
-export function updateProjectLayoutAsync(layouts, projectId) {
+export function updateProjectLayoutAsync(layouts, projectId, taskListIdsToFoul) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         var newTrimmedLayouts = sanitizeLayouts(layouts);
 
         // Update Firestore.
-        var projectLayoutsRef = getProjectLayoutRef(getFirestore, getState, projectId);
-        projectLayoutsRef.doc(projectId).update({ layouts: newTrimmedLayouts }).then(() => {
+        var batch = getFirestore().batch();
+
+        var projectLayoutRef = getProjectLayoutRef(getFirestore, getState, projectId).doc(projectId);
+        batch.update(projectLayoutRef, {layouts: newTrimmedLayouts });
+
+        // taskListIdsToFoul - Task Lists that don't yet have a corresponding Project Layout entity are considered
+        // 'fresh', they have a property 'isFresh' that tracks that. By virtue of the fact that we are updating a
+        // projects layout, we can also update any fresh Task Lists isFresh property. ie: fouling them.
+        if (taskListIdsToFoul !== undefined && taskListIdsToFoul !== null) {
+            taskListIdsToFoul.forEach(id => {
+                var ref = getTaskListRef(getFirestore, getState, id);
+
+                batch.update(ref, { isFresh: false });
+            })
+        }
+
+        batch.commit().then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(error => {
             handleFirebaseUpdateError(error, getState(), dispatch);
-        })
+        });
     }
 }
 
@@ -1782,10 +1797,7 @@ export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
 
         var taskListRef = getTaskListRef(getFirestore, getState, taskListWidgetId);
 
-        taskListRef.update({
-             taskListName: newName,
-             isFresh: false,
-             }).then(() => {
+        taskListRef.update({ taskListName: newName }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(error => {
             handleFirebaseUpdateError(error, getState(), dispatch);
