@@ -1265,7 +1265,6 @@ function attachAuthListenerAsync() {
             if (user) {
 
                 if (newUser !== null) {
-                    console.log(newUser);
                     // A new user has just registered. Make a directory listing for them.
                     var ref = getFirestore().collection(_paths.DIRECTORY).doc(newUser.email);
                     ref.set(Object.assign({}, new _pounderStores.DirectoryStore(newUser.email, newUser.displayName, user.uid))).then(function () {
@@ -1918,7 +1917,7 @@ function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue, currentMeta
     };
 }
 
-function updateProjectLayoutAsync(layouts, projectId) {
+function updateProjectLayoutAsync(layouts, projectId, taskListIdsToFoul) {
     return function (dispatch, getState, _ref37) {
         var getFirestore = _ref37.getFirestore,
             getAuth = _ref37.getAuth,
@@ -1928,8 +1927,23 @@ function updateProjectLayoutAsync(layouts, projectId) {
         var newTrimmedLayouts = sanitizeLayouts(layouts);
 
         // Update Firestore.
-        var projectLayoutsRef = getProjectLayoutRef(getFirestore, getState, projectId);
-        projectLayoutsRef.doc(projectId).update({ layouts: newTrimmedLayouts }).then(function () {
+        var batch = getFirestore().batch();
+
+        var projectLayoutRef = getProjectLayoutRef(getFirestore, getState, projectId).doc(projectId);
+        batch.update(projectLayoutRef, { layouts: newTrimmedLayouts });
+
+        // taskListIdsToFoul - Task Lists that don't yet have a corresponding Project Layout entity are considered
+        // 'fresh', they have a property 'isFresh' that tracks that. By virtue of the fact that we are updating a
+        // projects layout, we can also update any fresh Task Lists isFresh property. ie: fouling them.
+        if (taskListIdsToFoul !== undefined && taskListIdsToFoul !== null) {
+            taskListIdsToFoul.forEach(function (id) {
+                var ref = getTaskListRef(getFirestore, getState, id);
+
+                batch.update(ref, { isFresh: false });
+            });
+        }
+
+        batch.commit().then(function () {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(function (error) {
             handleFirebaseUpdateError(error, getState(), dispatch);
@@ -2028,10 +2042,7 @@ function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
         dispatch(setOpenTaskListWidgetHeaderId(-1));
         var taskListRef = getTaskListRef(getFirestore, getState, taskListWidgetId);
 
-        taskListRef.update({
-            taskListName: newName,
-            isFresh: false
-        }).then(function () {
+        taskListRef.update({ taskListName: newName }).then(function () {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(function (error) {
             handleFirebaseUpdateError(error, getState(), dispatch);
@@ -2598,7 +2609,6 @@ function handleAuthError(dispatch, error) {
             break;
 
         default:
-            console.log("Hitting Default");
             dispatch(postSnackbarMessage(error.code + ' : ' + error.message, false, 'error'));
     }
 }
