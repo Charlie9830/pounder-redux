@@ -1498,9 +1498,11 @@ export function updateProjectNameAsync(projectId, newValue) {
         dispatch(setOpenProjectSelectorId(-1));
         dispatch(setFloatingTextInput(false));
 
+        var coercedValue = newValue === "" ? "Untitled Project" : newValue;
+
         // Update Firestore.
         var projectRef = getProjectRef(getFirestore, getState, projectId);
-        projectRef.update({ projectName: newValue }).then(() => {
+        projectRef.update({ projectName: coercedValue }).then(() => {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(error => {
             handleFirebaseUpdateError(error, getState(), dispatch);
