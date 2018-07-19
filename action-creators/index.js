@@ -1983,33 +1983,18 @@ function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue, currentMeta
     };
 }
 
-function updateProjectLayoutAsync(layouts, projectId, taskListIdsToFoul) {
-    return function (dispatch, getState, _ref37) {
-        var getFirestore = _ref37.getFirestore,
-            getAuth = _ref37.getAuth,
-            getDexie = _ref37.getDexie,
-            getFunctions = _ref37.getFunctions;
+function updateProjectLayoutAsync(layouts, projectId) {
+    return function (dispatch, getState, _ref38) {
+        var getFirestore = _ref38.getFirestore,
+            getAuth = _ref38.getAuth,
+            getDexie = _ref38.getDexie,
+            getFunctions = _ref38.getFunctions;
 
         var newTrimmedLayouts = sanitizeLayouts(layouts);
 
         // Update Firestore.
-        var batch = getFirestore().batch();
-
-        var projectLayoutRef = getProjectLayoutRef(getFirestore, getState, projectId).doc(projectId);
-        batch.update(projectLayoutRef, { layouts: newTrimmedLayouts });
-
-        // taskListIdsToFoul - Task Lists that don't yet have a corresponding Project Layout entity are considered
-        // 'fresh', they have a property 'isFresh' that tracks that. By virtue of the fact that we are updating a
-        // projects layout, we can also update any fresh Task Lists isFresh property. ie: fouling them.
-        if (taskListIdsToFoul !== undefined && taskListIdsToFoul !== null) {
-            taskListIdsToFoul.forEach(function (id) {
-                var ref = getTaskListRef(getFirestore, getState, id);
-
-                batch.update(ref, { isFresh: false });
-            });
-        }
-
-        batch.commit().then(function () {
+        var projectLayoutsRef = getProjectLayoutRef(getFirestore, getState, projectId);
+        projectLayoutsRef.doc(projectId).update({ layouts: newTrimmedLayouts }).then(function () {
             // Carefull what you do here, promises don't resolve if you are offline.
         }).catch(function (error) {
             handleFirebaseUpdateError(error, getState(), dispatch);
