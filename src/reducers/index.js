@@ -134,15 +134,21 @@ export function appReducer(state, action) {
             return {
                 ...state,
                 localProjects: action.projects,
-                projects: [...action.projects.sort(projectSorter), ...state.remoteProjects],
+                projects: [...sortProjects(state.generalConfig.sortProjectsBy, action.projects), ...state.remoteProjects],
                 isAwaitingFirebase: false,
+            }
+
+        case ActionTypes.SET_IS_IN_REGISTER_MODE:
+            return {
+                ...state,
+                isInRegisterMode: action.value,
             }
 
         case ActionTypes.RECEIVE_REMOTE_PROJECTS:
             return {
                 ...state,
                 remoteProjects: action.projects,
-                projects: [...state.localProjects, ...action.projects.sort(projectSorter)]
+                projects: [...state.localProjects, ...sortProjects(state.generalConfig.sortProjectsBy, action.projects)],
             }
             
         case ActionTypes.SET_UPDATING_USER_IDS: {
@@ -402,7 +408,9 @@ export function appReducer(state, action) {
                     generalConfig: action.value,
                     isDexieConfigLoadComplete: true,
                     isAppSettingsOpen: true,
+                    isSidebarOpen: true,
                     appSettingsMenuPage: 'account',
+                    isInRegisterMode: true,
                 }
             }
 
@@ -412,9 +420,9 @@ export function appReducer(state, action) {
                     ...state,
                     generalConfig: action.value,
                     isDexieConfigLoadComplete: true,
+                    projects: maybeReSortProjects(state, action.value) // Returns re sorted projects if generalConfig.sortProjectsBy has changed. 
                 }
             }
-            
         }
 
         case ActionTypes.SET_IS_STARTING_UP_FLAG: {
@@ -486,6 +494,7 @@ export function appReducer(state, action) {
                 ...state,
                 isLoggedIn: action.value,
                 isLoggingIn: false,
+                isInRegisterMode: false,
             }
         }
         
@@ -617,13 +626,67 @@ export function appReducer(state, action) {
 }
 
 // Helper Methods.
+function maybeReSortProjects(state, newGeneralConfig) {
+    if (state.generalConfig.sortProjectsBy !== newGeneralConfig.sortProjectsBy) {
+        // Projects need a resort.
+        return [...sortProjects(newGeneralConfig.sortProjectsBy, state.localProjects),
+             ...sortProjects(newGeneralConfig.sortProjectsBy, state.remoteProjects)] 
+    }
 
-// Sort Projects alphabetically.
-function projectSorter(a,b) {
+    else {
+        // No resort required. Just return as is.
+        return state.projects;
+    }
+}
+
+
+function sortProjects(sortBy, newProjects) {
+    var coercedSortBy = sortBy === undefined ? 'alphabetically' : sortBy;
+    var sorterFunction = getProjectSorter(coercedSortBy);
+    
+    return newProjects.sort(sorterFunction);
+}
+
+function getProjectSorter(sortBy) {
+    switch(sortBy) {
+        case 'alphabetically':
+        return projectAlphabeticalSorter;
+
+        case 'created':
+        return projectCreatedSorter;
+
+        case 'updated':
+        return projectUpdatedSorter;
+
+        default:
+        return projectAlphabeticalSorter;
+    }
+}
+
+
+function projectAlphabeticalSorter(a,b) {
     var textA = a.projectName.toUpperCase();
     var textB = b.projectName.toUpperCase();
 
     return (textA < textB) ? -1 : (textA > textB) ? 1 : 0;
+}
+
+function projectCreatedSorter(a,b) {
+    var coercedA = a.created === undefined ? "" : a.created;
+    var coercedB = b.created === undefined ? "" : b.created;
+
+    var dateA = coercedA.length === 0 ? Infinity : new Date(coercedA);
+    var dateB = coercedB.length === 0 ? Infinity : new Date(coercedB);
+    return dateB - dateA;
+}
+
+function projectUpdatedSorter(a, b) {
+    var coercedA = a.updated === undefined ? "" : a.updated;
+    var coercedB = b.updated === undefined ? "" : b.updated;
+
+    var dateA = coercedA.length === 0 ? -1 : new Date(coercedA);
+    var dateB = coercedB.length === 0 ? -1 : new Date(coercedB);
+    return dateB - dateA;
 }
 
 function isFirstTimeBoot(generalConfig) {

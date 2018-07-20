@@ -4,7 +4,7 @@ import { USERS, PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS, ACCOUNT, ACCOUNT_DOC
      REMOTE_IDS, REMOTES, MEMBERS, INVITES, DIRECTORY } from 'pounder-firebase/paths';
 import { setUserUid, getUserUid } from 'pounder-firebase';
 import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore, CssConfigStore, MemberStore,
-InviteStore, RemoteStore, TaskMetadataStore, DirectoryStore} from 'pounder-stores';
+InviteStore, RemoteStore, TaskMetadataStore, DirectoryStore, ProjectFactory} from 'pounder-stores';
 import Moment from 'moment';
 import { includeMetadataChanges } from '../index';
 import parseArgs from 'minimist';
@@ -23,6 +23,13 @@ export function setShowOnlySelfTasks(newValue) {
     return {
         type: ActionTypes.SET_SHOW_ONLY_SELF_TASKS,
         value: newValue,
+    }
+}
+
+export function setIsInRegisterMode(value) {
+    return {
+        type: ActionTypes.SET_IS_IN_REGISTER_MODE,
+        value: value,
     }
 }
 
@@ -523,16 +530,22 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
-export function updateTaskAssignedToAsync(userId, taskId) {
+export function updateTaskAssignedToAsync(newUserId, oldUserId, taskId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(closeCalendar());
-        var taskRef = getTaskRef(getFirestore, getState, taskId);
-        
-        taskRef.update({assignedTo: userId }).then( () => {
-            // Careful what you do here, Promises don't resolve Offline.
-        }).catch(error => {
-            handleFirebaseUpdateError(error, getState(), dispatch);
-        })
+
+        if (newUserId !== oldUserId) {
+            var taskRef = getTaskRef(getFirestore, getState, taskId);
+
+            taskRef.update({ assignedTo: newUserId }).then(() => {
+                // Careful what you do here, Promises don't resolve Offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            })
+
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
+        }
     }
 }
 
@@ -550,15 +563,13 @@ export function sendPasswordResetEmailAsync() {
 
 export function registerNewUserAsync(email, password, displayName) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        dispatch(setAuthStatusMessage("Registering..."));
 
         if (displayName === "") {
             dispatch(postSnackbarMessage("Please enter a display name", true, 'negative-notification'));
-            dispatch(setIsLoggingInFlag(false));
-            dispatch(setAuthStatusMessage(""));
         }
 
         else {
+            dispatch(setIsLoggingInFlag(true));
             // Save the users details so they can be pushed to the Directory once they are logged in. This is because we can't set
             // a cloud function trigger to watch for a profile update, we also can't provide the display name along with the
             // createUserWithEmailAndPassword function, so this is the current best way to set a directory entry without concurrency
@@ -566,7 +577,7 @@ export function registerNewUserAsync(email, password, displayName) {
             newUser = { email: email, displayName: displayName };
 
             getAuth().createUserWithEmailAndPassword(email, password).then(() => {
-                // User Created. Push their desired Display name to Authentication.
+                // Push their desired Display name to Authentication.
                 getAuth().currentUser.updateProfile({ displayName: displayName }).then( () => {
                     dispatch(setDisplayName(displayName));
 
@@ -579,10 +590,17 @@ export function registerNewUserAsync(email, password, displayName) {
             }).catch(error => {
                 handleAuthError(dispatch, error);
                 dispatch(setIsLoggingInFlag(false));
-                dispatch(setAuthStatusMessage(""));
+
             })
         }
     }
+}
+
+function clearFirstTimeBootFlag(dispatch, getState) {
+    var generalConfig = getState().generalConfig;
+    generalConfig.isFirstTimeBoot = false;
+
+    dispatch(setGeneralConfigAsync(generalConfig));
 }
 
 export function acceptProjectInviteAsync(projectId) {
@@ -674,12 +692,22 @@ export function subscribeToRemoteProjectAsync(projectId) {
             if (doc.exists) {
                 var projectName = doc.get('projectName');
                 var members = doc.get('members');
+                var created = doc.get('created');
+                var updated = doc.get('updated');
 
                 var filteredProjects = getState().remoteProjects.filter(item => {
                     return item.uid !== doc.id;
                 })
 
-                filteredProjects.push({ projectName: projectName, members: members, uid: doc.id, isRemote: true});
+                filteredProjects.push({
+                    projectName: projectName,
+                    members: members,
+                    uid: doc.id,
+                    isRemote: true,
+                    created: created,
+                    updated: updated
+                });
+
                 dispatch(receiveRemoteProjects(filteredProjects));
             }
         })
@@ -768,6 +796,9 @@ export function unsubscribeFromRemoteProjectAsync(projectId) {
 
 export function migrateProjectBackToLocalAsync(projectId, projectName) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        // Extract project from State before you unsubscribe from Database.
+        var project = extractProject(getState, projectId);
+
         dispatch(setIsShareMenuWaiting(true));
         dispatch(setShareMenuMessage("Migrating project."))
         dispatch(selectProject(-1));
@@ -777,7 +808,7 @@ export function migrateProjectBackToLocalAsync(projectId, projectName) {
             if (result.data.status === 'complete') {
                 dispatch(unsubscribeFromDatabaseAsync());
 
-                moveProjectToLocalLocationAsync(getFirestore, projectId, projectName).then( () => {
+                moveProjectToLocalLocationAsync(getState, getFirestore, projectId, project).then( () => {
                     dispatch(subscribeToDatabaseAsync());
                     dispatch(setIsShareMenuWaiting(false));
                     dispatch(setShareMenuMessage(""));
@@ -802,7 +833,7 @@ export function migrateProjectBackToLocalAsync(projectId, projectName) {
     }
 }
 
-function moveProjectToLocalLocationAsync(getFirestore, projectId, projectName) {
+function moveProjectToLocalLocationAsync(getState, getFirestore, projectId, currentProject) {
     return new Promise((resolve, reject) => {
         // Transfer Project to Local Location.
         var remoteRef = getFirestore().collection(REMOTES).doc(projectId);
@@ -811,11 +842,13 @@ function moveProjectToLocalLocationAsync(getFirestore, projectId, projectName) {
         var requests = [];
 
         // Top Level Project Data.
-        var project = {
-            uid: projectId,
-            projectName: projectName,
-            isRemote: false,
-        }
+        var project = ProjectFactory(
+            currentProject.projectName,
+            projectId,
+            false,
+            currentProject.created,
+            currentProject.updated
+        )
 
         // Project
         var topLevelUserRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).doc(projectId);
@@ -882,6 +915,7 @@ export function inviteUserToProjectAsync(projectName, targetEmail, sourceEmail, 
             if (result.data.status === 'user found') {
                 // User Found.
                 var userData = result.data.userData;
+
                 var inviteData = {
                     projectName: projectName,
                     sourceEmail: sourceEmail,
@@ -896,7 +930,7 @@ export function inviteUserToProjectAsync(projectName, targetEmail, sourceEmail, 
 
                 // If the project isn't Remote already it needs to be Moved. Promise will resolve Imediately if no migration
                 // is required, otherwise it will resolve when migration is complete.
-                maybeMigrateProjectAsync(dispatch, getFirestore, getState, projectId, projectName).then(() => {
+                maybeMigrateProjectAsync(dispatch, getFirestore, getState, projectId).then(() => {
                     dispatch(setShareMenuMessage('Sending invite.'));
 
                     var sendProjectInvite = getFunctions().httpsCallable('sendProjectInvite');
@@ -973,18 +1007,20 @@ export function kickUserFromProjectAsync(projectId, userId) {
     }
 }
 
-function maybeMigrateProjectAsync(dispatch, getFirestore, getState, projectId, projectName) {
+function maybeMigrateProjectAsync(dispatch, getFirestore, getState, projectId) {
     // Maybe migrate the project first if requried. Saves you copying the code into two branches of an if else.
     // If project is already remote, promise will resolve imediately and allow further execution to continue, otherwise it will
     // hold.. This is maybe a good candidate for await/async.
     return new Promise((resolve, reject) => {
         if (!isProjectRemote(getState, projectId)) {
             // Migrate project to 'remotes' collection.
+            // Extract the project before you unsubscribe from the Database.
+            var project = extractProject(getState, projectId);
             dispatch(selectProject(-1));
             dispatch(setShareMenuMessage('Migrating Project...'));
             dispatch(unsubscribeFromDatabaseAsync(projectId));
 
-            moveProjectToRemoteLocationAsync(getFirestore, getState, projectId, projectName).then(() => {
+            moveProjectToRemoteLocationAsync(getFirestore, getState, projectId, project).then(() => {
                 dispatch(subscribeToDatabaseAsync())
                 dispatch(selectProject(projectId));
                 resolve();
@@ -1002,7 +1038,7 @@ function maybeMigrateProjectAsync(dispatch, getFirestore, getState, projectId, p
 }
 
 
-function moveProjectToRemoteLocationAsync(getFirestore, getState, projectId, projectName)  {
+function moveProjectToRemoteLocationAsync(getFirestore, getState, projectId, currentProject)  {
     return new Promise((resolve, reject) => {
         // Transfer Project.
         var userRef = getFirestore().collection(USERS).doc(getUserUid());
@@ -1010,12 +1046,15 @@ function moveProjectToRemoteLocationAsync(getFirestore, getState, projectId, pro
         var sourceBatch = new FirestoreBatchPaginator(getFirestore());
         var requests = [];
 
-        // Top Level Project Data.
-        var topLevelData = {
-            uid: projectId,
-            projectName: projectName,
-            isRemote: true,
-        }
+        var topLevelData = ProjectFactory(
+            currentProject.projectName,
+            projectId,
+            true,
+            currentProject.created,
+            currentProject.updated
+        )
+
+
         var topLevelRef = getFirestore().collection(REMOTES).doc(projectId);
         targetBatch.set(topLevelRef, topLevelData);
         sourceBatch.delete(getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).doc(projectId));
@@ -1076,7 +1115,10 @@ export function attachAuthListenerAsync() {
             if (user) {
 
                 if (newUser !== null) {
-                    // A new user has just registered. Make a directory listing for them.
+                    // A new user has just registered.
+                    clearFirstTimeBootFlag(dispatch, getState);
+
+                    //  Make a directory listing for them.
                     var ref = getFirestore().collection(DIRECTORY).doc(newUser.email);
                     ref.set(Object.assign({}, new DirectoryStore(newUser.email, newUser.displayName, user.uid))).then(() => {
                         // Complete.
@@ -1086,6 +1128,10 @@ export function attachAuthListenerAsync() {
                          ${error.message}`;
                         dispatch(postSnackbarMessage(message, false, 'error'));
                     });
+                }
+
+                if (getState().generalConfig.isFirstTimeBoot) {
+                    clearFirstTimeBootFlag(dispatch, getState);
                 }
                 
                 // User is Logged in.
@@ -1396,40 +1442,50 @@ export function getDatabaseInfoAsync() {
     }
 }
 
-export function updateTaskPriority(taskId, newValue, currentMetadata) {
+export function updateTaskPriority(taskId, newValue, oldValue, currentMetadata) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(closeCalendar());
 
-        // Determine Reference.
-        var taskRef = getTaskRef(getFirestore, getState, taskId);
+        if (newValue !== oldValue) {
+            // Determine Reference.
+            var taskRef = getTaskRef(getFirestore, getState, taskId);
 
-        // Update Firestore.
-        taskRef.update({
-            isHighPriority: newValue,
-            metadata: getUpdatedMetadata(currentMetadata, { updatedBy: getState().displayName, updatedOn: getHumanFriendlyDate() })
-        }).then(() => {
-            // Careful what you do here, promises don't resolve if you are offline.
-        }).catch(error => {
-            handleFirebaseUpdateError(error, getState(), dispatch);
-        })
+            // Update Firestore.
+            taskRef.update({
+                isHighPriority: newValue,
+                metadata: getUpdatedMetadata(currentMetadata, { updatedBy: getState().displayName, updatedOn: getHumanFriendlyDate() })
+            }).then(() => {
+                // Careful what you do here, promises don't resolve if you are offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            })
+
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
+        }
     }
 }
 
-export function updateTaskDueDateAsync(taskId, newDate, currentMetadata) {
+export function updateTaskDueDateAsync(taskId, newDate, oldDate, currentMetadata) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(closeCalendar());
 
-        // Update Firestore.
-        var taskRef = getTaskRef(getFirestore, getState, taskId);
-        taskRef.update({
-            dueDate: newDate,
-            isNewTask: false,
-            metadata: getUpdatedMetadata(currentMetadata, { updatedBy: getState().displayName, updatedOn: getHumanFriendlyDate() })
-        }).then(() => {
-            // Carefull what you do here, promises don't resolve if you are offline.
-        }).catch(error => {
-            handleFirebaseUpdateError(error, getState(), dispatch);
-        })
+        if (newDate !== oldDate) {
+            // Update Firestore.
+            var taskRef = getTaskRef(getFirestore, getState, taskId);
+            taskRef.update({
+                dueDate: newDate,
+                isNewTask: false,
+                metadata: getUpdatedMetadata(currentMetadata, { updatedBy: getState().displayName, updatedOn: getHumanFriendlyDate() })
+            }).then(() => {
+                // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            })
+
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
+        }
     }
 }
 
@@ -1487,26 +1543,34 @@ export function removeTaskListAsync(taskListWidgetId) {
             })
 
             dispatch(changeFocusedTaskList(-1));
+
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
         }
 
     }
 }
 
 
-export function updateProjectNameAsync(projectId, newValue) {
+export function updateProjectNameAsync(projectId, newValue, oldValue) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(setOpenProjectSelectorId(-1));
         dispatch(setFloatingTextInput(false));
 
         var coercedValue = newValue === "" ? "Untitled Project" : newValue;
+        if (coercedValue !== oldValue) {
 
-        // Update Firestore.
-        var projectRef = getProjectRef(getFirestore, getState, projectId);
-        projectRef.update({ projectName: coercedValue }).then(() => {
-            // Carefull what you do here, promises don't resolve if you are offline.
-        }).catch(error => {
-            handleFirebaseUpdateError(error, getState(), dispatch);
-        })
+            // Update Firestore.
+            var projectRef = getProjectRef(getFirestore, getState, projectId);
+            projectRef.update({ projectName: coercedValue }).then(() => {
+                // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            })
+
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
+        }
     }
 }
 
@@ -1605,7 +1669,7 @@ export function addNewProjectAsync() {
             var newProjectRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).doc();
             var newProjectKey = newProjectRef.id;
 
-            var newProject = new ProjectStore(newProjectName, newProjectKey, false);
+            var newProject = new ProjectStore(newProjectName, newProjectKey, false, new Date().toISOString(), "");
             batch.set(newProjectRef, Object.assign({}, newProject));
 
             // Layout
@@ -1644,7 +1708,7 @@ export function addNewProjectWithNameAsync(projectName) {
             var newProjectRef = getFirestore().collection(USERS).doc(getUserUid()).collection(PROJECTS).doc();
             var newProjectKey = newProjectRef.id;
 
-            var newProject = new ProjectStore(newProjectName, newProjectKey, false);
+            var newProject = new ProjectStore(newProjectName, newProjectKey, false, new Date().toISOString(), "");
             batch.set(newProjectRef, Object.assign({}, newProject));
 
             // Layout
@@ -1667,29 +1731,34 @@ export function addNewProjectWithNameAsync(projectName) {
     }
 }
 
-export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue, currentMetadata) {
+export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue, oldValue, currentMetadata) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        if (getState().selectedTask.taskListWidgetId !== taskListWidgetId &&
-            getState().selectedTask.taskId !== taskId) {
-            dispatch(selectTask(taskListWidgetId, taskId, false));
-        }
+        if (oldValue !== newValue) {
+            if (getState().selectedTask.taskListWidgetId !== taskListWidgetId &&
+                getState().selectedTask.taskId !== taskId) {
+                dispatch(selectTask(taskListWidgetId, taskId, false));
+            }
 
-        // Update Firestore.
-        var taskRef = getTaskRef(getFirestore, getState, taskId);
+            // Update Firestore.
+            var taskRef = getTaskRef(getFirestore, getState, taskId);
 
-        taskRef.update({
-            isComplete: newValue,
-            isNewTask: false,
-            metadata: getUpdatedMetadata(currentMetadata, {
-                updatedBy: getState().displayName,
-                updatedOn: getHumanFriendlyDate(),
-                completedBy: getState().displayName
+            taskRef.update({
+                isComplete: newValue,
+                isNewTask: false,
+                metadata: getUpdatedMetadata(currentMetadata, {
+                    updatedBy: getState().displayName,
+                    updatedOn: getHumanFriendlyDate(),
+                    completedBy: getState().displayName
+                })
+            }).then(() => {
+                // Carefull what you do here, promises don't resolve if you are offline.h.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
             })
-        }).then(() => {
-            // Carefull what you do here, promises don't resolve if you are offline.h.
-        }).catch(error => {
-            handleFirebaseUpdateError(error, getState(), dispatch);
-        })
+
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
+        }
     }
 }
 
@@ -1723,27 +1792,33 @@ export function updateProjectLayoutAsync(layouts, projectId, taskListIdsToFoul) 
 }
 
 
-export function updateTaskNameAsync(taskListWidgetId, taskId, newData, currentMetadata) {
+export function updateTaskNameAsync(taskListWidgetId, taskId, newValue, oldValue, currentMetadata) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(closeTask(taskListWidgetId, taskId));
         dispatch(setFloatingTextInput(false));
 
-        var update = {
-            taskName: newData,
-            isNewTask: false, // Reset new Task Property.
-            metadata: getUpdatedMetadata(currentMetadata, {updatedBy: getState().displayName, updatedOn: getHumanFriendlyDate()})
-        }
+            // Because we Reset the new task property. (Which supports pushing new Tasks to the top of the List).
+            // We can't perform an equality check. We have to naievly update.
 
-        // Returns a new Update Object with arguments parsed in (if any);
-        var newUpdate = parseArgumentsIntoUpdate(getState, update);
-        
-        // Update Firestore.
-        var taskRef = getTaskRef(getFirestore, getState, taskId);
-        taskRef.update(newUpdate).then(() => {
-            // Carefull what you do here, promises don't resolve if you are offline.
-        }).catch(error => {
-            handleFirebaseUpdateError(error, getState(), dispatch);
-        })
+            var update = {
+                taskName: newValue,
+                isNewTask: false, // Reset new Task Property.
+                metadata: getUpdatedMetadata(currentMetadata, { updatedBy: getState().displayName, updatedOn: getHumanFriendlyDate() })
+            }
+
+            // Returns a new Update Object with arguments parsed in (if any);
+            var newUpdate = parseArgumentsIntoUpdate(getState, update);
+
+            // Update Firestore.
+            var taskRef = getTaskRef(getFirestore, getState, taskId);
+            taskRef.update(newUpdate).then(() => {
+                // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            })
+
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
     }
 }
 
@@ -1752,12 +1827,15 @@ export function removeSelectedTaskAsync() {
 
         var taskId = getState().selectedTask.taskId;
         if (taskId !== -1) {
-            deleteTaskAsync(getFirestore, getState, taskId).then( () => {
+            deleteTaskAsync(getFirestore, getState, taskId).then(() => {
                 // Careful what you do here. Promises don't resolve Offline.
             }).catch(error => {
                 handleFirebaseUpdateError(error, getState(), dispatch);
             })
             dispatch(selectTask(getState().focusedTaskListId, -1, false));
+
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
         }
     }
 }
@@ -1765,12 +1843,15 @@ export function removeSelectedTaskAsync() {
 export function removeTaskAsync(taskId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (taskId !== -1) {
-            deleteTaskAsync(getFirestore, getState, taskId).then( () => {
+            deleteTaskAsync(getFirestore, getState, taskId).then(() => {
                 // Careful what you do here. Promises don't resolve Offline.
             }).catch(error => {
                 handleFirebaseUpdateError(error, getState(), dispatch);
             })
             dispatch(selectTask(getState().focusedTaskListId, -1, false));
+
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
         }
     }
 }
@@ -1789,21 +1870,29 @@ function deleteTaskAsync(getFirestore, getState, taskId) {
         }).catch(error => {
             reject(error);
         });
+
+        // Project updated metadata.
+        updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
     })
 }
 
-export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName) {
+export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName, oldName) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(setOpenTaskListWidgetHeaderId(-1));
         dispatch(setFloatingTextInput(false));
 
-        var taskListRef = getTaskListRef(getFirestore, getState, taskListWidgetId);
+        if (newName !== oldName) {
+            var taskListRef = getTaskListRef(getFirestore, getState, taskListWidgetId);
 
-        taskListRef.update({ taskListName: newName }).then(() => {
-            // Carefull what you do here, promises don't resolve if you are offline.
-        }).catch(error => {
-            handleFirebaseUpdateError(error, getState(), dispatch);
-        })
+            taskListRef.update({ taskListName: newName }).then(() => {
+                // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            })
+
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
+        }
     }
 }
 
@@ -1828,6 +1917,9 @@ export function moveTaskAsync(destinationTaskListId) {
         })
 
         dispatch(endTaskMove(movingTaskId, destinationTaskListId));
+
+        // Project updated metadata.
+        updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
     }
 }
 
@@ -1876,6 +1968,9 @@ export function addNewTaskAsync() {
                 })
 
                 dispatch(openTask(newTask.taskList, newTask.uid)); // Opening a Task by convention Selects it.
+
+                // Project updated metadata.
+                updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
 
             }
         }
@@ -1941,6 +2036,9 @@ export function addNewTaskWithNameAsync(taskName) {
 
             dispatch(selectTask(focusedTaskListId, newTaskKey, false));
 
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
+
         }
     }
 }
@@ -1981,6 +2079,9 @@ export function addNewTaskListAsync() {
             }).catch(error => {
                 handleFirebaseUpdateError(error, getState(), dispatch);
             })
+
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
         }
     }
 }
@@ -2021,6 +2122,9 @@ export function addNewTaskListWithNameAsync(taskListName) {
             }).catch(error => {
                 handleFirebaseUpdateError(error, getState(), dispatch);
             })
+
+            // Project updated metadata.
+            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
         }
     }
 }
@@ -2244,6 +2348,23 @@ export function unsubscribeProjectLayoutsAsync(projectId) {
 }
 
 // Helper Functions.
+function extractProject(getState, projectId) {
+    return getState().projects.find(item => {
+        return item.uid === projectId;
+    })
+}
+
+function updateProjectUpdatedTime(getState, getFirestore, projectId) {
+    var ref = getProjectRef(getFirestore, getState, projectId);
+
+    ref.update({updated: new Date().toISOString()}).then( () => {
+        // Careful what you do here, promises don't resolve Offline.
+    }).catch(error => {
+        handleFirebaseUpdateError(error, getState(), dispatch);
+    })
+}
+
+
 function addUpdatingInviteId(dispatch, getState, inviteId) {
     var oldUpdatingInviteIds = getState().updatingInviteIds;
 

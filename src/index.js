@@ -93,13 +93,14 @@ var initialState = {
     updatingInviteIds: [],
     openTaskOptionsId: -1,
     showOnlySelfTasks: false,
-    floatingTextInput: { isOpen: false, currentText: '', targetType: '', targetId: '' }
+    floatingTextInput: { isOpen: false, currentText: '', targetType: '', targetId: '' },
+    isInRegisterMode: false,
 }
 
 export var appStore = createStore(
     appReducer,
     initialState,
-    applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth, getDexie, getFunctions } ), /* Logger */)
+applyMiddleware(ReduxThunk.withExtraArgument( { getFirestore, getAuth, getDexie, getFunctions } ), /* Logger */ )
 );
 
 // Types.
