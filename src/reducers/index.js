@@ -527,7 +527,7 @@ export function appReducer(state, action) {
                 ...state,
                 isSnackbarOpen: false,
                 snackbarMessage: "",
-                isSnackbarSelfDismissing: false,
+                isSnackbarSelfDismissing: true,
             }
         }
 
