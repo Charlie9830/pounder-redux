@@ -2033,7 +2033,7 @@ export function addNewTaskWithNameAsync(taskName) {
                 focusedTaskListId,
                 newTaskKey,
                 new Moment().toISOString(),
-                true,
+                false,
                 parsedPriority,
                 Object.assign({}, metadata),
                 -1,
