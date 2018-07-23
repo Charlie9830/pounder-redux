@@ -26,6 +26,12 @@ export function setShowOnlySelfTasks(newValue) {
     }
 }
 
+export function cancelTaskMove() {
+    return {
+        type: ActionTypes.CANCEL_TASK_MOVE,
+    }
+}
+
 export function setIsInRegisterMode(value) {
     return {
         type: ActionTypes.SET_IS_IN_REGISTER_MODE,
@@ -54,10 +60,10 @@ export function setOpenTaskListWidgetHeaderId(taskListId) {
     }
 }
 
-export function setFloatingTextInput(isOpen, currentText, targetType, targetId) {
+export function setFloatingTextInput(isOpen, currentText, targetType, niceTargetName, targetId) {
     return {
         type: ActionTypes.SET_FLOATING_TEXT_INPUT,
-        value: { isOpen: isOpen, currentText: currentText, targetType: targetType, targetId: targetId}
+        value: { isOpen: isOpen, currentText: currentText, targetType: targetType, niceTargetName: niceTargetName, targetId: targetId}
     }
 }
 
@@ -570,13 +576,15 @@ export function registerNewUserAsync(email, password, displayName) {
 
         else {
             dispatch(setIsLoggingInFlag(true));
+            var parsedEmail = email.toLowerCase().trim();
+
             // Save the users details so they can be pushed to the Directory once they are logged in. This is because we can't set
             // a cloud function trigger to watch for a profile update, we also can't provide the display name along with the
             // createUserWithEmailAndPassword function, so this is the current best way to set a directory entry without concurrency
             // issues.
-            newUser = { email: email, displayName: displayName };
+            newUser = { email: parsedEmail, displayName: displayName };
 
-            getAuth().createUserWithEmailAndPassword(email, password).then(() => {
+            getAuth().createUserWithEmailAndPassword(parsedEmail, password).then(() => {
                 // Push their desired Display name to Authentication.
                 getAuth().currentUser.updateProfile({ displayName: displayName }).then( () => {
                     dispatch(setDisplayName(displayName));
@@ -1246,9 +1254,11 @@ export function logInUserAsync(email,password) {
         dispatch(setIsLoggingInFlag(true));
         dispatch(setAuthStatusMessage("Logging in"));
 
+        var parsedEmail = email.toLowerCase().trim();
+
         // Set Persistence.
         getAuth().setPersistence('local').then(() => {
-            getAuth().signInWithEmailAndPassword(email, password).catch(error => {
+            getAuth().signInWithEmailAndPassword(parsedEmail, password).catch(error => {
                 handleAuthError(dispatch, error);
                 dispatch(setIsLoggingInFlag(false));
                 dispatch(setAuthStatusMessage("Logged out"));

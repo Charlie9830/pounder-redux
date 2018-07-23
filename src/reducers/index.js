@@ -118,6 +118,15 @@ export function appReducer(state, action) {
                     isMetadataOpen: false
                 }
             }
+
+        case ActionTypes.CANCEL_TASK_MOVE: 
+            return {
+                ...state,
+                isATaskMoving: false,
+                sourceTaskListId: -1,
+                movingTaskId: -1,
+            }
+
         case ActionTypes.START_PROJECTS_FETCH:
             return {
                 ...state,

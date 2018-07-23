@@ -93,7 +93,7 @@ var initialState = {
     updatingInviteIds: [],
     openTaskOptionsId: -1,
     showOnlySelfTasks: false,
-    floatingTextInput: { isOpen: false, currentText: '', targetType: '', targetId: '' },
+    floatingTextInput: { isOpen: false, currentText: '', targetType: '', niceTargetName: '', targetId: '' },
     isInRegisterMode: false,
 }
 
