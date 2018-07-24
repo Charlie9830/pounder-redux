@@ -1126,6 +1126,13 @@ export function attachAuthListenerAsync() {
                     // A new user has just registered.
                     clearFirstTimeBootFlag(dispatch, getState);
 
+                    // Send them to the Welcome Page if on Desktop.
+                    if (HANDBALL_DEVICE === 'desktop') {
+                        dispatch(setIsAppSettingsOpen(true));
+                        dispatch(setAppSettingsMenuPage('welcome'));
+                    }
+                    
+
                     //  Make a directory listing for them.
                     var ref = getFirestore().collection(DIRECTORY).doc(newUser.email);
                     ref.set(Object.assign({}, new DirectoryStore(newUser.email, newUser.displayName, user.uid))).then(() => {
