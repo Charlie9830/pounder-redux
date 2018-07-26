@@ -1528,19 +1528,28 @@ export function removeTaskListAsync(taskListWidgetId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (taskListWidgetId !== -1) {
             // Update Firestore.
+            var selectedProjectId = getState().selectedProjectId;
+            var isCurrentProjectRemote = isProjectRemote(getState, selectedProjectId);
+
             // Collect related TaskIds.
             var taskIds = collectTaskListRelatedTaskIds(getState().tasks, taskListWidgetId);
 
             // Build Batch.
             var batch = getFirestore().batch();
 
+            if (isRemovingLastTaskList(getState, selectedProjectId)) {
+                // We are about to remove the last Task list. Queue up a request to delete any remaining Project Layouts.
+                var projectLayoutRef = getProjectLayoutRef(getFirestore, getState, selectedProjectId);
+                batch.update(projectLayoutRef.doc(selectedProjectId), {layouts: [] });
+            }
+
             // Task list
             var taskListRef = getTaskListRef(getFirestore, getState, taskListWidgetId);
             batch.delete(taskListRef);
 
             // Tasks.
-            if (isProjectRemote(getState, getState().selectedProjectId)) {
-                var selectedProjectId = getState().selectedProjectId;
+            if (isCurrentProjectRemote) {
+                var selectedProjectId = selectedProjectId;
                 taskIds.forEach(id => {
                     batch.delete(getFirestore().collection(REMOTES).doc(selectedProjectId).collection(TASKS).doc(id));
                 })
@@ -1562,7 +1571,7 @@ export function removeTaskListAsync(taskListWidgetId) {
             dispatch(changeFocusedTaskList(-1));
 
             // Project updated metadata.
-            updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
+            updateProjectUpdatedTime(getState, getFirestore, selectedProjectId);
         }
 
     }
@@ -1782,6 +1791,16 @@ export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue, oldV
 export function updateProjectLayoutAsync(layouts, projectId, taskListIdsToFoul) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         var newTrimmedLayouts = sanitizeLayouts(layouts);
+
+        // var selectedLayoutsWrapper = getState().projectLayouts.find(item => {
+        //     return item.uid === projectId;
+        // })
+
+        // var oldLayouts = selectedLayoutsWrapper === undefined ? "nothing" : sanitizeLayouts(selectedLayoutsWrapper.layouts);
+
+        // console.table(newTrimmedLayouts);
+        // console.table(oldLayouts);
+        // console.log(compareProjectLayouts(oldLayouts, newTrimmedLayouts));
 
         // Update Firestore.
         var batch = getFirestore().batch();
@@ -2365,6 +2384,23 @@ export function unsubscribeProjectLayoutsAsync(projectId) {
 }
 
 // Helper Functions.
+function isRemovingLastTaskList(getState, projectId) {
+    var filteredTaskLists = []
+    filteredTaskLists = getState().taskLists.filter(item => {
+        return item.project === projectId;
+    })
+
+    return filteredTaskLists.length === 1;
+}
+
+function compareProjectLayouts(layoutsA, layoutsB) {
+    var layoutsAJSON = JSON.stringify(layoutsA);
+    var layoutsBJSON = JSON.stringify(layoutsB);
+
+    return layoutsAJSON === layoutsBJSON;
+}
+
+
 function extractProject(getState, projectId) {
     return getState().projects.find(item => {
         return item.uid === projectId;
