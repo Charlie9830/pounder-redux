@@ -1788,42 +1788,35 @@ export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue, oldV
     }
 }
 
-export function updateProjectLayoutAsync(layouts, projectId, taskListIdsToFoul) {
+export function updateProjectLayoutAsync(layouts, oldLayouts, projectId, taskListIdsToFoul) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         var newTrimmedLayouts = sanitizeLayouts(layouts);
+        var oldTrimmedLayouts = sanitizeLayouts(oldLayouts);
 
-        // var selectedLayoutsWrapper = getState().projectLayouts.find(item => {
-        //     return item.uid === projectId;
-        // })
+        if (compareProjectLayouts(oldTrimmedLayouts, newTrimmedLayouts) !== true) {
+            // Update Firestore.
+            var batch = getFirestore().batch();
 
-        // var oldLayouts = selectedLayoutsWrapper === undefined ? "nothing" : sanitizeLayouts(selectedLayoutsWrapper.layouts);
+            var projectLayoutRef = getProjectLayoutRef(getFirestore, getState, projectId).doc(projectId);
+            batch.update(projectLayoutRef, { layouts: newTrimmedLayouts });
 
-        // console.table(newTrimmedLayouts);
-        // console.table(oldLayouts);
-        // console.log(compareProjectLayouts(oldLayouts, newTrimmedLayouts));
+            // taskListIdsToFoul - Task Lists that don't yet have a corresponding Project Layout entity are considered
+            // 'fresh', they have a property 'isFresh' that tracks that. By virtue of the fact that we are updating a
+            // projects layout, we can also update any fresh Task Lists isFresh property. ie: fouling them.
+            if (taskListIdsToFoul !== undefined && taskListIdsToFoul !== null) {
+                taskListIdsToFoul.forEach(id => {
+                    var ref = getTaskListRef(getFirestore, getState, id);
 
-        // Update Firestore.
-        var batch = getFirestore().batch();
+                    batch.update(ref, { isFresh: false });
+                })
+            }
 
-        var projectLayoutRef = getProjectLayoutRef(getFirestore, getState, projectId).doc(projectId);
-        batch.update(projectLayoutRef, {layouts: newTrimmedLayouts });
-
-        // taskListIdsToFoul - Task Lists that don't yet have a corresponding Project Layout entity are considered
-        // 'fresh', they have a property 'isFresh' that tracks that. By virtue of the fact that we are updating a
-        // projects layout, we can also update any fresh Task Lists isFresh property. ie: fouling them.
-        if (taskListIdsToFoul !== undefined && taskListIdsToFoul !== null) {
-            taskListIdsToFoul.forEach(id => {
-                var ref = getTaskListRef(getFirestore, getState, id);
-
-                batch.update(ref, { isFresh: false });
-            })
+            batch.commit().then(() => {
+                // Carefull what you do here, promises don't resolve if you are offline.
+            }).catch(error => {
+                handleFirebaseUpdateError(error, getState(), dispatch);
+            });
         }
-
-        batch.commit().then(() => {
-            // Carefull what you do here, promises don't resolve if you are offline.
-        }).catch(error => {
-            handleFirebaseUpdateError(error, getState(), dispatch);
-        });
     }
 }
 
