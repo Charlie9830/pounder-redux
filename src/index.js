@@ -95,6 +95,7 @@ var initialState = {
     showOnlySelfTasks: false,
     floatingTextInput: { isOpen: false, currentText: '', targetType: '', niceTargetName: '', targetId: '' },
     isInRegisterMode: false,
+    showCompletedTasks: true,
 }
 
 export var appStore = createStore(
