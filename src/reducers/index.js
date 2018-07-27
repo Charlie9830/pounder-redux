@@ -628,6 +628,13 @@ export function appReducer(state, action) {
             }
         }
 
+        case ActionTypes.SET_SHOW_COMPLETED_TASKS: {
+            return {
+                ...state,
+                showCompletedTasks: action.value,
+            }
+        }
+
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);
             return state;

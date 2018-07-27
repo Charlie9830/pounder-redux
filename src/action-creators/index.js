@@ -28,8 +28,17 @@ var invitesUnsubscribe = null;
 var showCompletedLocalTasksUnsubscribe = null;
 var hideCompletedLocalTasksUnsubscribe = null;
 
-var remoteProjectUnsubscribes = {};
+var remoteProjectsUnsubscribes = {};
 
+// Flags.
+/*
+    When constraining the found set to just non complete tasks, Firebase will return a snapshot with 0 doc Changes.
+    handleTasksSnapshot() will by default bail out early if their are zero doc changes thinking that it is just a metadata update.
+    We need to set the flags below to overide this behaviour when we are trying to Toggle the Queries.
+*/
+
+var isTogglingShowCompletedLocalTasks = false;
+var isTogglingShowCompletedRemoteTasks = false;
 
 // Standard Action Creators.
 export function setShowOnlySelfTasks(newValue) {
@@ -470,12 +479,7 @@ export function receiveRemoteProjectLayouts(projectLayouts) {
     }
 }
 
-export function selectProject(projectId) {
-    return {
-        type: ActionTypes.SELECT_PROJECT,
-        projectId: projectId
-    }
-}
+
 
 export function closeCalendar() {
     return {
@@ -537,7 +541,22 @@ export function receiveRemoteProjectIds(ids) {
     }
 }
 
+export function setShowCompletedTasks(value) {
+    return {
+        type: ActionTypes.SET_SHOW_COMPLETED_TASKS,
+        value: value,
+    }
+}
+
 // Private Actions.
+// Private as actions need to be routed through selectProjectAsync first.
+function selectProject(projectId) {
+    return {
+        type: ActionTypes.SELECT_PROJECT,
+        projectId: projectId
+    }
+}
+
 // Should only be dispatched by moveTaskAsync(), as moveTaskAsync() gets the movingTaskId from the State. Calling this from elsewhere
 // could create a race Condition.
 function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
@@ -549,6 +568,76 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
+export function selectProjectAsync(projectId) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        if (getState().showCompletedTasks === true) {
+            // Toggle showCompleted tasks off before setting state, it relies on knowing the old selected projectId to 
+            // unsubscribe remote query listeners.
+            dispatch(setShowCompletedTasksAsync(false));
+        }
+
+        dispatch(selectProject(projectId));
+    }
+}
+
+
+export function setShowCompletedTasksAsync(showCompletedTasks) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        if (showCompletedTasks !== getState().showCompletedTasks) {
+            dispatch(setShowCompletedTasks(showCompletedTasks))
+
+            isTogglingShowCompletedLocalTasks = true;
+
+            if (showCompletedTasks === true) {
+                // Toggle to alternate Task Query.
+                // Local.
+                if (hideCompletedLocalTasksUnsubscribe !== null) {
+                    hideCompletedLocalTasksUnsubscribe();
+                }
+
+                dispatch(getTasksAsync(showCompletedTasks));
+
+                // Remotes.
+                if (getState().isSelectedProjectRemote) {
+                    isTogglingShowCompletedRemoteTasks = true;
+
+                    var selectedProjectId = getState().selectedProjectId;
+                    var remoteProjectUnsubscribe = remoteProjectsUnsubscribes[selectedProjectId];
+                    if (remoteProjectUnsubscribe.hideCompletedTasks !== null) {
+                        remoteProjectUnsubscribe.hideCompletedTasks();
+
+                        remoteProjectUnsubscribe.showCompletedTasks = subscribeToRemoteTasks(true, getFirestore, getState, dispatch, selectedProjectId)
+                    }
+                }
+            }
+
+            else {
+                // Toggle to alternate Task Query.
+                // Local.
+                if (showCompletedLocalTasksUnsubscribe !== null) {
+                    showCompletedLocalTasksUnsubscribe();
+                }
+
+                dispatch(getTasksAsync(showCompletedTasks));
+
+                // Remote.
+                if (getState().isSelectedProjectRemote) {
+                    isTogglingShowCompletedRemoteTasks = true;
+
+                    var selectedProjectId = getState().selectedProjectId;
+                    var remoteProjectUnsubscribe = remoteProjectsUnsubscribes[selectedProjectId];
+                    if (remoteProjectUnsubscribe.hideCompletedTasks !== null) {
+                        remoteProjectUnsubscribe.hideCompletedTasks();
+
+                        remoteProjectUnsubscribe.showCompletedTasks = subscribeToRemoteTasks(false, getFirestore, getState, dispatch, selectedProjectId)
+                    }
+                }
+            }
+        }
+
+    }
+}
+
 export function updateTaskAssignedToAsync(newUserId, oldUserId, taskId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(closeCalendar());
@@ -748,17 +837,12 @@ export function subscribeToRemoteProjectAsync(projectId) {
         var hideCompletedTasksUnsubscribe = null;
 
         if (getState().showCompletedTasks === true) {
-            showCompletedTasksUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).collection(TASKS).orderBy('project').onSnapshot(includeMetadataChanges, snapshot => {
-                handleTasksSnapshot(getState, dispatch, true, snapshot, projectId);
-            })
+            showCompletedTasksUnsubscribe = subscribeToRemoteTasks(true, getFirestore, getState, dispatch, projectId);
         }
 
         else {
-            hideCompletedTasksUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).collection(TASKS).where('isComplete', '==', false).orderBy('project').onSnapshot(includeMetadataChanges, snapshot => {
-                handleTasksSnapshot(getState, dispatch, true, snapshot, projectId);
-            })
+            hideCompletedTasksUnsubscribe = subscribeToRemoteTasks(false, getFirestore, getState, dispatch, projectId);
         }
-        
 
         // ProjectLayout.
         var projectLayoutUnsubscribe = getFirestore().collection(REMOTES).doc(projectId).collection(PROJECTLAYOUTS).onSnapshot(includeMetadataChanges, snapshot => {
@@ -773,6 +857,21 @@ export function subscribeToRemoteProjectAsync(projectId) {
             hideCompletedTasks: hideCompletedTasksUnsubscribe,
             projectLayout: projectLayoutUnsubscribe,
         }
+    }
+}
+ 
+
+function subscribeToRemoteTasks(showCompletedTasks, getFirestore, getState, dispatch, projectId) {
+    if (showCompletedTasks === true) {
+        return getFirestore().collection(REMOTES).doc(projectId).collection(TASKS).orderBy('project').onSnapshot(includeMetadataChanges, snapshot => {
+            handleTasksSnapshot(getState, dispatch, true, snapshot, projectId);
+        })
+    }
+
+    else {
+        return getFirestore().collection(REMOTES).doc(projectId).collection(TASKS).where('isComplete', '==', false).orderBy('project').onSnapshot(includeMetadataChanges, snapshot => {
+            handleTasksSnapshot(getState, dispatch, true, snapshot, projectId);
+        })
     }
 }
 
@@ -795,7 +894,7 @@ function handleMembersSnapshot(getState, dispatch, snapshot, projectId) {
 export function unsubscribeFromRemoteProjectAsync(projectId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         // Project.
-        remoteProjectUnsubscribes[projectId].project();
+        remoteProjectsUnsubscribes[projectId].project();
         
         // Extract and remove from State.
         var remoteProjects = getState().remoteProjects.filter(item => {
@@ -804,10 +903,10 @@ export function unsubscribeFromRemoteProjectAsync(projectId) {
         dispatch(receiveRemoteProjects(remoteProjects));
 
         // Members.
-        remoteProjectUnsubscribes[projectId].members();
+        remoteProjectsUnsubscribes[projectId].members();
         
         // TaskLists.
-        remoteProjectUnsubscribes[projectId].taskLists();
+        remoteProjectsUnsubscribes[projectId].taskLists();
 
         // Extract and remove from state.
         var taskLists = getState().remoteTaskLists.filter(item => {
@@ -816,8 +915,8 @@ export function unsubscribeFromRemoteProjectAsync(projectId) {
         dispatch(receiveRemoteTaskLists(taskLists));
 
         // Tasks.
-        if (remoteProjectUnsubscribes[projectId].showCompletedTasks !== null) { remoteProjectUnsubscribes[projectId].showCompletedTasks() }
-        if (remoteProjectUnsubscribes[projectId].hideCompletedTasks !== null) { remoteProjectUnsubscribes[projectId].hideCompletedTasks() }
+        if (remoteProjectsUnsubscribes[projectId].showCompletedTasks !== null) { remoteProjectsUnsubscribes[projectId].showCompletedTasks() }
+        if (remoteProjectsUnsubscribes[projectId].hideCompletedTasks !== null) { remoteProjectsUnsubscribes[projectId].hideCompletedTasks() }
         
         // Extract and remove from state.
         var tasks = getState().remoteTasks.filter(item => {
@@ -826,7 +925,7 @@ export function unsubscribeFromRemoteProjectAsync(projectId) {
         dispatch(receiveRemoteTasks(tasks));
 
         // ProjectLayout.
-        remoteProjectUnsubscribes[projectId].projectLayouts();
+        remoteProjectsUnsubscribes[projectId].projectLayout();
 
         // Extract and remove from state.
         var projectLayouts = getState().remoteProjectLayouts.filter(item => {
@@ -843,7 +942,7 @@ export function migrateProjectBackToLocalAsync(projectId, projectName) {
 
         dispatch(setIsShareMenuWaiting(true));
         dispatch(setShareMenuMessage("Migrating project."))
-        dispatch(selectProject(-1));
+        dispatch(selectProjectAsync(-1));
 
         var kickAllUsersFromProject = getFunctions().httpsCallable('kickAllUsersFromProject');
         kickAllUsersFromProject({projectId: projectId}).then(result => {
@@ -982,7 +1081,7 @@ export function inviteUserToProjectAsync(projectName, targetEmail, sourceEmail, 
                             dispatch(setIsShareMenuWaiting(false));
                             dispatch(setShareMenuMessage(""));
                             dispatch(setShareMenuSubMessage(""));
-                            dispatch(selectProject(projectId));
+                            dispatch(selectProjectAsync(projectId));
                             clearTimeout(slowMessageTimer);
                         }
 
@@ -1058,13 +1157,19 @@ function maybeMigrateProjectAsync(dispatch, getFirestore, getState, projectId) {
             // Migrate project to 'remotes' collection.
             // Extract the project before you unsubscribe from the Database.
             var project = extractProject(getState, projectId);
-            dispatch(selectProject(-1));
+
+            // Clear data to stop RGL seeing Tasklists with the same ID, if only breifly.
+            dispatch(clearData());
+
+            // This used to be able to stop RGL seeing tasklists with the same ID, but now it is Async and doesn't complete in time.
+            dispatch(selectProjectAsync(-1));
+
             dispatch(setShareMenuMessage('Migrating Project...'));
             dispatch(unsubscribeFromDatabaseAsync(projectId));
 
             moveProjectToRemoteLocationAsync(getFirestore, getState, projectId, project).then(() => {
                 dispatch(subscribeToDatabaseAsync())
-                dispatch(selectProject(projectId));
+                dispatch(selectProjectAsync(projectId));
                 resolve();
             }).catch(error => {
                 dispatch(postSnackbarMessage(error.message, false, 'error'));
@@ -1202,7 +1307,7 @@ export function attachAuthListenerAsync() {
                     dispatch(setIsLoggedInFlag(false));
                     dispatch(setUserEmail(""));
                     dispatch(setDisplayName(""));
-                    dispatch(selectProject(-1));
+                    dispatch(selectProjectAsync(-1));
                     dispatch(clearData());
 
                     setUserUid(""); // Clear UserUid Last as actions above may require it to build valid Database References.
@@ -1640,7 +1745,7 @@ export function removeProjectAsync(projectId) {
         dispatch(setShowOnlySelfTasks(false));
 
         if (getState.selectedProjectId !== -1) {
-            dispatch(selectProject(-1));
+            dispatch(selectProjectAsync(-1));
             // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
             // been loaded in via the handleProjectSelectorClick method. No point in querying Firebase again for this data.
             var taskListIds = getState().taskLists.filter(item => {
@@ -1687,7 +1792,7 @@ export function removeRemoteProjectAsync(projectId) {
         if (projectId !== -1 && isProjectRemote(getState, projectId)) {
             dispatch(setIsShareMenuWaiting(true));
             dispatch(setShareMenuMessage("Deleting Project"));
-            dispatch(selectProject(-1));
+            dispatch(selectProjectAsync(-1));
 
             var removeRemoteProject = getFunctions().httpsCallable('removeRemoteProject');
             removeRemoteProject({projectId: projectId}).then(result => {
@@ -1740,7 +1845,7 @@ export function addNewProjectAsync() {
             batch.set(newLayoutRef, Object.assign({}, newProjectLayout));
 
             // Selections.
-            dispatch(selectProject(newProjectKey));
+            dispatch(selectProjectAsync(newProjectKey));
             dispatch(setOpenProjectSelectorId(newProjectKey));
 
 
@@ -1779,7 +1884,7 @@ export function addNewProjectWithNameAsync(projectName) {
             batch.set(newLayoutRef, Object.assign({}, newProjectLayout));
 
             // Selections.
-            dispatch(selectProject(newProjectKey));
+            dispatch(selectProjectAsync(newProjectKey));
 
             // Execute Additions.
             batch.commit().then(() => {
@@ -2205,7 +2310,7 @@ export function getAccountConfigAsync() {
                     parseInt(accountConfig.favouriteProjectId) :
                     accountConfig.favouriteProjectId;
 
-                dispatch(selectProject(favouriteProjectId));
+                dispatch(selectProjectAsync(favouriteProjectId));
             }
         }, error => {
             handleFirebaseSnapshotError(error, getState(), dispatch);
@@ -2243,7 +2348,7 @@ export function getTasksAsync(showCompletedTasks) {
         // Get Tasks from Firestore.
         var tasksRef = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS);
 
-        if (showCompletedTasks) {
+        if (showCompletedTasks === true) {
             // Get all Tasks.
             showCompletedLocalTasksUnsubscribe = tasksRef.orderBy("project").onSnapshot(includeMetadataChanges, snapshot => {
                 handleTasksSnapshot(getState, dispatch, false, snapshot);
@@ -2270,7 +2375,11 @@ function handleTasksSnapshot(getState, dispatch, isRemote, snapshot, remoteProje
     }
 
     // Handle Tasks.
-    if (snapshot.docChanges().length > 0) {
+    if (snapshot.docChanges().length > 0 ||  isTogglingShowCompletedLocalTasks || isTogglingShowCompletedRemoteTasks ) {
+        // Reset flags, check for the state of isRemote so they don't reset eachothers Flags.
+        if (isTogglingShowCompletedLocalTasks && !isRemote) { isTogglingShowCompletedLocalTasks = false };
+        if (isTogglingShowCompletedRemoteTasks && isRemote) { isTogglingShowCompletedRemoteTasks = false };
+
         var tasks = [];
         snapshot.forEach(doc => {
             tasks.push(doc.data());
@@ -2288,9 +2397,6 @@ function handleTasksSnapshot(getState, dispatch, isRemote, snapshot, remoteProje
         else {
             dispatch(receiveLocalTasks(tasks));
         }
-
-        
-        
     }
 }
 
@@ -2425,6 +2531,7 @@ export function unsubscribeInvitesAsync() {
 export function unsubscribeProjectLayoutsAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (localProjectLayoutsUnsubscribe !== null) {
+            console.log("unsubscribing Project Layout");
             localProjectLayoutsUnsubscribe();
         }
     }
