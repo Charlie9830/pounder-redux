@@ -363,14 +363,6 @@ export function startTasksFetch() {
     }
 }
 
-
-export function receiveRemoteTasks(tasks) {
-    return {
-        type: ActionTypes.RECEIVE_REMOTE_TASKS,
-        tasks: tasks,
-    }
-}
-
 export function lockApp() {
     return {
         type: ActionTypes.LOCK_APP,
@@ -561,15 +553,14 @@ export function receiveCompletedRemoteTasks(value) {
     }
 }
 
-// Private Actions.
-// Private as actions need to be routed through selectProjectAsync first.
-function selectProject(projectId) {
+export function selectProject(projectId) {
     return {
         type: ActionTypes.SELECT_PROJECT,
         projectId: projectId
     }
 }
 
+// Private Actions.
 // Should only be dispatched by moveTaskAsync(), as moveTaskAsync() gets the movingTaskId from the State. Calling this from elsewhere
 // could create a race Condition.
 function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
@@ -581,19 +572,6 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
-export function selectProjectAsync(projectId) {
-    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        if (getState().showCompletedTasks === true) {
-            // Toggle showCompleted tasks off before setting state, it relies on knowing the old selected projectId to 
-            // unsubscribe remote query listeners.
-            dispatch(setShowCompletedTasksAsync(false));
-        }
-
-        dispatch(selectProject(projectId));
-    }
-}
-
-
 export function setShowCompletedTasksAsync(showCompletedTasks) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (showCompletedTasks !== getState().showCompletedTasks) {
@@ -615,33 +593,32 @@ export function setShowCompletedTasksAsync(showCompletedTasks) {
             }
 
             else {
-                // Local.
-                // Unsubscribe from changes and Clear Local State.
-                if (onlyCompletedLocalTasksUnsubscribe !== null) {
-                    onlyCompletedLocalTasksUnsubscribe();
-                }
-
+                unsubscribeCompletedTasks();
                 dispatch(receiveCompletedLocalTasks([]));
-
-                // Remote.
-                // Unsubscribe from changes and clear Local state.
-                if (getState().isSelectedProjectRemote) {
-                    var selectedProjectId = getState().selectedProjectId;
-                    var remoteProjectUnsubscribe = remoteProjectsUnsubscribes[selectedProjectId];
-                    
-                    if (remoteProjectUnsubscribe !== undefined && remoteProjectUnsubscribe.onlyCompletedTasks !== null) {
-                         remoteProjectUnsubscribe.onlyCompletedTasks();
-                    }
-
-                    dispatch(receiveCompletedRemoteTasks([]));
-                }
+                dispatch(receiveCompletedRemoteTasks([]));
             }
         }
     }
 }
 
-function unsubscribeCompletedTasks(remoteProjectId) {
-    
+function unsubscribeCompletedTasks() {
+    // Local.
+    // Unsubscribe from changes and Clear Local State.
+    if (onlyCompletedLocalTasksUnsubscribe !== null) {
+        onlyCompletedLocalTasksUnsubscribe();
+    }
+
+    // Remote.
+    // Unsubscribe from changes and clear Local state.
+    /*
+        Why unsubscribe from every remote project? We are trying to avoid having to use getState or getFirestore so that we can
+        consume this method outside of a Thunk.
+    */
+    for (var projectId in remoteProjectUnsubscribes) {
+        if (remoteProjectUnsubscribes[projectId].onlyCompletedTasks !== null) {
+            remoteProjectsUnsubscribes[projectId].onlyCompletedTasks();
+        }
+    }
 }
 
 export function updateTaskAssignedToAsync(newUserId, oldUserId, taskId) {
@@ -920,10 +897,17 @@ export function unsubscribeFromRemoteProjectAsync(projectId) {
         if (remoteProjectsUnsubscribes[projectId].onlyCompletedTasks !== null) { remoteProjectsUnsubscribes[projectId].onlyCompletedTasks }
         
         // Extract and remove from state.
-        var tasks = getState().remoteTasks.filter(item => {
+        var incompletedTasks = getState().incompletedRemoteTasks.filter(item => {
             return item.project !== projectId;
         })
-        dispatch(receiveRemoteTasks(tasks));
+        dispatch(receiveIncompletedRemoteTasks(incompletedTasks));
+
+        if (getState().showCompletedTasks) {
+            var completedTasks = getState().completedRemoteTasks.filter(item => {
+                return item.project !== projectId;
+            })
+        dispatch(receiveCompletedRemoteTasks(completedTasks));
+        }
 
         // ProjectLayout.
         remoteProjectsUnsubscribes[projectId].projectLayout();
@@ -943,7 +927,8 @@ export function migrateProjectBackToLocalAsync(projectId, projectName) {
 
         dispatch(setIsShareMenuWaiting(true));
         dispatch(setShareMenuMessage("Migrating project."))
-        dispatch(selectProjectAsync(-1));
+        dispatch(setShowCompletedTasksAsync(false));
+        dispatch(selectProject(-1));
 
         var kickAllUsersFromProject = getFunctions().httpsCallable('kickAllUsersFromProject');
         kickAllUsersFromProject({projectId: projectId}).then(result => {
@@ -1082,7 +1067,7 @@ export function inviteUserToProjectAsync(projectName, targetEmail, sourceEmail, 
                             dispatch(setIsShareMenuWaiting(false));
                             dispatch(setShareMenuMessage(""));
                             dispatch(setShareMenuSubMessage(""));
-                            dispatch(selectProjectAsync(projectId));
+                            dispatch(selectProject(projectId));
                             clearTimeout(slowMessageTimer);
                         }
 
@@ -1159,18 +1144,15 @@ function maybeMigrateProjectAsync(dispatch, getFirestore, getState, projectId) {
             // Extract the project before you unsubscribe from the Database.
             var project = extractProject(getState, projectId);
 
-            // Clear data to stop RGL seeing Tasklists with the same ID, if only breifly.
-            dispatch(clearData());
-
-            // This used to be able to stop RGL seeing tasklists with the same ID, but now it is Async and doesn't complete in time.
-            dispatch(selectProjectAsync(-1));
-
+            dispatch(setShowCompletedTasksAsync(false));
+            dispatch(selectProject(-1));
+            dispatch(clearData()); // Stops RGL seeing duplicate Task Lists.
             dispatch(setShareMenuMessage('Migrating Project...'));
             dispatch(unsubscribeFromDatabaseAsync(projectId));
 
             moveProjectToRemoteLocationAsync(getFirestore, getState, projectId, project).then(() => {
                 dispatch(subscribeToDatabaseAsync())
-                dispatch(selectProjectAsync(projectId));
+                dispatch(selectProject(projectId));
                 resolve();
             }).catch(error => {
                 dispatch(postSnackbarMessage(error.message, false, 'error'));
@@ -1308,7 +1290,7 @@ export function attachAuthListenerAsync() {
                     dispatch(setIsLoggedInFlag(false));
                     dispatch(setUserEmail(""));
                     dispatch(setDisplayName(""));
-                    dispatch(selectProjectAsync(-1));
+                    dispatch(selectProject(-1));
                     dispatch(clearData());
 
                     setUserUid(""); // Clear UserUid Last as actions above may require it to build valid Database References.
@@ -1747,7 +1729,8 @@ export function removeProjectAsync(projectId) {
         dispatch(setShowOnlySelfTasks(false));
 
         if (getState.selectedProjectId !== -1) {
-            dispatch(selectProjectAsync(-1));
+            dispatch(setShowCompletedTasksAsync(false));
+            dispatch(selectProject(-1));
             // Get a List of Task List Id's . It's Okay to collect these from State as associated taskLists have already
             // been loaded in via the handleProjectSelectorClick method. No point in querying Firebase again for this data.
             var taskListIds = getState().taskLists.filter(item => {
@@ -1794,7 +1777,8 @@ export function removeRemoteProjectAsync(projectId) {
         if (projectId !== -1 && isProjectRemote(getState, projectId)) {
             dispatch(setIsShareMenuWaiting(true));
             dispatch(setShareMenuMessage("Deleting Project"));
-            dispatch(selectProjectAsync(-1));
+            dispatch(setShowCompletedTasksAsync(false));
+            dispatch(selectProject(-1));
 
             var removeRemoteProject = getFunctions().httpsCallable('removeRemoteProject');
             removeRemoteProject({projectId: projectId}).then(result => {
@@ -1847,7 +1831,7 @@ export function addNewProjectAsync() {
             batch.set(newLayoutRef, Object.assign({}, newProjectLayout));
 
             // Selections.
-            dispatch(selectProjectAsync(newProjectKey));
+            dispatch(selectProject(newProjectKey));
             dispatch(setOpenProjectSelectorId(newProjectKey));
 
 
@@ -1886,7 +1870,7 @@ export function addNewProjectWithNameAsync(projectName) {
             batch.set(newLayoutRef, Object.assign({}, newProjectLayout));
 
             // Selections.
-            dispatch(selectProjectAsync(newProjectKey));
+            dispatch(selectProject(newProjectKey));
 
             // Execute Additions.
             batch.commit().then(() => {
@@ -2312,7 +2296,7 @@ export function getAccountConfigAsync() {
                     parseInt(accountConfig.favouriteProjectId) :
                     accountConfig.favouriteProjectId;
 
-                dispatch(selectProjectAsync(favouriteProjectId));
+                dispatch(selectProject(favouriteProjectId));
             }
         }, error => {
             handleFirebaseSnapshotError(error, getState(), dispatch);
