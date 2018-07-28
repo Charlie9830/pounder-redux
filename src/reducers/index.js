@@ -185,24 +185,42 @@ export function appReducer(state, action) {
                 isAwaitingFirebase: true
             }
 
-        case ActionTypes.RECEIVE_LOCAL_TASKS:
-            var newTasks = [...action.tasks, ...state.remoteTasks];
+        case ActionTypes.RECEIVE_INCOMPLETED_LOCAL_TASKS: 
+            var newTasks = [...action.value, ...state.completedLocalTasks, ...state.incompletedRemoteTasks, ...state.completedRemoteTasks]
             return {
                 ...state,
                 isAwaitingFirebase: false,
                 tasks: newTasks,
-                localTasks: action.tasks,
+                incompletedLocalTasks: action.value,
+                projectSelectorDueDateDisplays: getProjectSelectorDueDateDisplaysHelper(newTasks),
+            }
+
+        case ActionTypes.RECEIVE_COMPLETED_LOCAL_TASKS:
+        var newTasks = [...state.incompletedLocalTasks, ...action.value, ...state.incompletedRemoteTasks, ...state.completedRemoteTasks];
+            return {
+                ...state,
+                isAwaitingFirebase: false,
+                tasks: newTasks,
+                completedLocalTasks: action.value,
+            }
+
+        case ActionTypes.RECEIVE_INCOMPLETED_REMOTE_TASKS:
+        var newTasks = [...state.incompletedLocalTasks, ...state.completedLocalTasks, ...action.value, ...state.completedRemoteTasks];
+            return {
+                ...state,
+                isAwaitingFirebase: false,
+                tasks: newTasks,
+                incompletedRemoteTasks: action.value,
                 projectSelectorDueDateDisplays: getProjectSelectorDueDateDisplaysHelper(newTasks)
             }
         
-        case ActionTypes.RECEIVE_REMOTE_TASKS:
-            var newTasks = [...state.localTasks, ...action.tasks];
+        case ActionTypes.RECEIVE_COMPLETED_REMOTE_TASKS:
+        var newTasks = [...state.incompletedLocalTasks, ...state.completedLocalTasks, ...state.incompletedRemoteTasks, ...action.value]
             return {
                 ...state,
                 isAwaitingFirebase: false,
                 tasks: newTasks,
-                remoteTasks: action.tasks,
-                projectSelectorDueDateDisplays: getProjectSelectorDueDateDisplaysHelper(newTasks)
+                completedRemoteTasks: action.value,
             }
         
         case ActionTypes.LOCK_APP:
