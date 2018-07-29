@@ -560,6 +560,13 @@ export function selectProject(projectId) {
     }
 }
 
+export function setIsProjectMenuOpen(isOpen) {
+    return {
+        type: ActionTypes.SET_IS_PROJECT_MENU_OPEN,
+        value: isOpen,
+    }
+}
+
 // Private Actions.
 // Should only be dispatched by moveTaskAsync(), as moveTaskAsync() gets the movingTaskId from the State. Calling this from elsewhere
 // could create a race Condition.
@@ -614,8 +621,8 @@ function unsubscribeCompletedTasks() {
         Why unsubscribe from every remote project? We are trying to avoid having to use getState or getFirestore so that we can
         consume this method outside of a Thunk.
     */
-    for (var projectId in remoteProjectUnsubscribes) {
-        if (remoteProjectUnsubscribes[projectId].onlyCompletedTasks !== null) {
+    for (var projectId in remoteProjectsUnsubscribes) {
+        if (remoteProjectsUnsubscribes[projectId].onlyCompletedTasks !== null) {
             remoteProjectsUnsubscribes[projectId].onlyCompletedTasks();
         }
     }

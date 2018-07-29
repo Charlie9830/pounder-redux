@@ -222,6 +222,12 @@ export function appReducer(state, action) {
                 tasks: newTasks,
                 completedRemoteTasks: action.value,
             }
+
+        case ActionTypes.SET_IS_PROJECT_MENU_OPEN:
+            return {
+                ...state,
+                isProjectMenuOpen: action.value,
+            }
         
         case ActionTypes.LOCK_APP:
             return {

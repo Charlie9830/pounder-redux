@@ -98,6 +98,7 @@ var initialState = {
     floatingTextInput: { isOpen: false, currentText: '', targetType: '', niceTargetName: '', targetId: '' },
     isInRegisterMode: false,
     showCompletedTasks: false,
+    isProjectMenuOpen: false,
 }
 
 export var appStore = createStore(
