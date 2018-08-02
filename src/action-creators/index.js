@@ -4,13 +4,14 @@ import { USERS, PROJECTS, PROJECTLAYOUTS, TASKS, TASKLISTS, ACCOUNT, ACCOUNT_DOC
      REMOTE_IDS, REMOTES, MEMBERS, INVITES, DIRECTORY } from 'pounder-firebase/paths';
 import { setUserUid, getUserUid } from 'pounder-firebase';
 import { ProjectStore, ProjectLayoutStore, TaskListStore, TaskListSettingsStore, TaskStore, CssConfigStore, MemberStore,
-InviteStore, RemoteStore, TaskMetadataStore, DirectoryStore, ProjectFactory} from 'pounder-stores';
+InviteStore, RemoteStore, TaskMetadataStore, DirectoryStore, ProjectFactory, ChecklistSettingsFactory} from 'pounder-stores';
 import Moment from 'moment';
 import { includeMetadataChanges } from '../index';
 import parseArgs from 'minimist';
 import stringArgv from 'string-argv';
 import Fuse from 'fuse.js';
-import { getDayPickerDate, getClearedDate, getDaysForwardDate, getWeeksForwardDate, getParsedDate } from 'pounder-utilities';
+import { getDayPickerDate, getClearedDate, getDaysForwardDate, getWeeksForwardDate, getParsedDate, getNormalizedDate,
+isChecklistDueForRenew } from 'pounder-utilities';
 var loremIpsum = require('lorem-ipsum');
 
 const legalArgsRegEx = / -dd | -hp /i;
@@ -579,6 +580,56 @@ function endTaskMove(movingTaskId, destinationTaskListWidgetId) {
 }
 
 // Thunks
+export function renewChecklistAsync(taskList, isRemote, projectId, userTriggered) {
+    return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
+        var taskListId = taskList.uid;
+
+        var tasksCollectionRef = isRemote === true ?
+        getFirestore().collection(REMOTES).doc(projectId).collection(TASKS) :
+        getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS);
+
+        tasksCollectionRef.where("taskList", "==", taskListId).get().then( snapshot => {
+            var taskRefs = [];
+            snapshot.forEach(doc => {
+                taskRefs.push(doc.ref);
+            })
+
+            var batch = getFirestore().batch();
+            
+            taskRefs.forEach(ref => {
+                batch.update(ref, { isComplete: false });
+            })
+
+            // Update the settings to represent the next requested renew Time, but only if this wasn't triggered by the user.
+            // User triggering could be from the "Renew Now" button. 
+            if (userTriggered !== true) {
+                var taskListRef = isRemote === true ?
+                    getFirestore().collection(REMOTES).doc(projectId).collection(TASKLISTS).doc(taskListId) :
+                    getFirestore().collection(USERS).doc(getUserUid()).collection(TASKLISTS).doc(taskListId);
+
+                var { nextRenewDate, renewInterval } = taskList.settings.checklistSettings;
+
+                var newChecklistSettings = { ...taskList.settings.checklistSettings, nextRenewDate: getNewRenewDate(nextRenewDate, renewInterval) };
+                var newTaskListSettings = { ...taskList.settings, checklistSettings: newChecklistSettings };
+
+                batch.update(taskListRef, { settings: newTaskListSettings });
+            }
+            
+
+            batch.commit().then( () => {
+                // Success
+            })
+            
+        })
+    }
+}
+
+function getNewRenewDate(currentRenewDate, renewInterval) {
+    var newRenewMoment = Moment(currentRenewDate).add(renewInterval, 'days');
+
+    return getNormalizedDate(newRenewMoment);
+}
+
 export function setShowCompletedTasksAsync(showCompletedTasks) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (showCompletedTasks !== getState().showCompletedTasks) {
@@ -1639,7 +1690,8 @@ export function updateTaskDueDateAsync(taskId, newDate, oldDate, currentMetadata
 
 export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        dispatch(setOpenTaskListSettingsMenuId(-1));
+
+        console.log(Moment(newValue.checklistSettings.nextRenewDate).format("dddd, MMMM Do YYYY, h:mm:ss a"));
 
         // Update Firestore.
         var taskListRef = getTaskListRef(getFirestore, getState, taskListWidgetId);
@@ -2229,7 +2281,7 @@ export function addNewTaskListAsync() {
                 selectedProjectId,
                 newTaskListRef.id,
                 newTaskListRef.id,
-                Object.assign({}, new TaskListSettingsStore(true, "completed")),
+                Object.assign({}, new TaskListSettingsStore(true, "completed", ChecklistSettingsFactory(false,"", "", 1))),
                 true,
             )
 
@@ -2273,7 +2325,7 @@ export function addNewTaskListWithNameAsync(taskListName) {
                 selectedProjectId,
                 newTaskListRef.id,
                 newTaskListRef.id,
-                Object.assign({}, new TaskListSettingsStore(true, "completed")),
+                Object.assign({}, new TaskListSettingsStore(true, "completed", ChecklistSettingsFactory(false,"", "", 1))),
                 true,
             )
 
@@ -2426,6 +2478,7 @@ export function getTaskListsAsync(projectId) {
 }
 
 function handleTaskListsSnapshot(getState, dispatch, isRemote, snapshot, remoteProjectId) {
+    console.log("Ding");
     // Handle Metadata.
     if (snapshot.metadata !== undefined ) {
         dispatch(setTaskListsHavePendingWrites(snapshot.metadata.hasPendingWrites));
@@ -2433,8 +2486,13 @@ function handleTaskListsSnapshot(getState, dispatch, isRemote, snapshot, remoteP
 
     if (snapshot.docChanges().length > 0) {
         var taskLists = [];
+        var checklists = [];
         snapshot.forEach(doc => {
-            taskLists.push(doc.data());
+            var taskList = coerceTaskList(doc.data());
+            taskLists.push(taskList);
+
+            // Keep track of checklists.
+            if (taskList.settings.checklistSettings.isChecklist) { checklists.push(taskList) };
         })
 
         if (isRemote) {
@@ -2444,13 +2502,39 @@ function handleTaskListsSnapshot(getState, dispatch, isRemote, snapshot, remoteP
 
             taskLists = [...taskLists, ...filteredTaskLists];
             dispatch(receiveRemoteTaskLists(taskLists));
+
+            // Renew any checklists requring renewel.
+            processChecklists(dispatch, checklists, true, remoteProjectId);
+            
         }
 
         else {
             dispatch(receiveLocalTaskLists(taskLists));
+
+            // Renew any checklists requring renewel.
+            processChecklists(dispatch, checklists, false, null);
         }
         
     }
+}
+
+function processChecklists(dispatch, checklists, isRemote, remoteProjectId) {
+    checklists.forEach(item => {
+
+        if (isChecklistDueForRenew(item.settings.checklistSettings.nextRenewDate)) {
+            dispatch(renewChecklistAsync(item, isRemote, remoteProjectId, false));
+        }
+    })
+}
+
+function coerceTaskList(taskList) {
+    var workingTaskList = {...taskList};
+
+    if (taskList.settings.checklistSettings === undefined) {
+        workingTaskList.settings.checklistSettings = ChecklistSettingsFactory(false,"", "", 1);
+    }
+
+    return workingTaskList;
 }
 
 export function getLocalProjectLayoutsAsync() {
@@ -2542,7 +2626,6 @@ export function unsubscribeInvitesAsync() {
 export function unsubscribeProjectLayoutsAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         if (localProjectLayoutsUnsubscribe !== null) {
-            console.log("unsubscribing Project Layout");
             localProjectLayoutsUnsubscribe();
         }
     }
