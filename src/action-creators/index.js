@@ -2356,6 +2356,11 @@ export function getAccountConfigAsync() {
                     accountConfig.favouriteProjectId;
 
                 dispatch(selectProject(favouriteProjectId));
+                
+                if (HANDBALL_DEVICE === "mobile") {
+                    dispatch(setIsSidebarOpen(false));
+                    dispatch(setIsAppSettingsOpen(false));
+                }
             }
         }, error => {
             handleFirebaseSnapshotError(error, getState(), dispatch);
