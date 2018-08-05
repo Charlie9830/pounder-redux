@@ -661,6 +661,13 @@ export function appReducer(state, action) {
             }
         }
 
+        case ActionTypes.CALCULATE_PROJECT_SELECTOR_DUE_DATE_DISPLAYS: {
+            return {
+                ...state,
+                projectSelectorDueDateDisplays: getProjectSelectorDueDateDisplaysHelper(state.tasks),
+            }
+        }
+
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);
             return state;

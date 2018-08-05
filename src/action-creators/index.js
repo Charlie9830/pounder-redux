@@ -568,6 +568,12 @@ export function setIsProjectMenuOpen(isOpen) {
     }
 }
 
+export function calculateProjectSelectorDueDateDisplays() {
+    return {
+        type: ActionTypes.CALCULATE_PROJECT_SELECTOR_DUE_DATE_DISPLAYS
+    }
+}
+
 // Private Actions.
 // Should only be dispatched by moveTaskAsync(), as moveTaskAsync() gets the movingTaskId from the State. Calling this from elsewhere
 // could create a race Condition.
