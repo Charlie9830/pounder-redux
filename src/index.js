@@ -86,6 +86,7 @@ var initialState = {
     snackbarMessage: "",
     snackbarType: "infomation",
     isSnackbarSelfDismissing: false,
+    isUpdateSnackbarOpen: false,
     isSidebarOpen: true,
     isShareMenuOpen: false,
     isShareMenuWaiting: false,

@@ -11,7 +11,7 @@ import parseArgs from 'minimist';
 import stringArgv from 'string-argv';
 import Fuse from 'fuse.js';
 import { getDayPickerDate, getClearedDate, getDaysForwardDate, getWeeksForwardDate, getParsedDate, getNormalizedDate,
-isChecklistDueForRenew } from 'pounder-utilities';
+isChecklistDueForRenew, isDayName, getDayNameDate } from 'pounder-utilities';
 var loremIpsum = require('lorem-ipsum');
 
 const legalArgsRegEx = / -dd | -hp /i;
@@ -574,6 +574,12 @@ export function calculateProjectSelectorDueDateDisplays() {
     }
 }
 
+export function setIsUpdateSnackbarOpen(isOpen) {
+    return {
+        type: ActionTypes.SET_IS_UPDATE_SNACKBAR_OPEN,
+        value: isOpen,
+    }
+}
 // Private Actions.
 // Should only be dispatched by moveTaskAsync(), as moveTaskAsync() gets the movingTaskId from the State. Calling this from elsewhere
 // could create a race Condition.
@@ -621,7 +627,6 @@ export function renewChecklistAsync(taskList, isRemote, projectId, userTriggered
                 batch.update(taskListRef, { settings: newTaskListSettings });
             }
             
-
             batch.commit().then( () => {
                 // Success
             })
@@ -3006,28 +3011,35 @@ function parseDateArgument(d) {
         return getDaysForwardDate(d);
     }
 
+    var value = d.toLowerCase();
+
     // Today.
-    else if (d === "today" || d === "Today") {
+    if (value === "today") {
         return getDaysForwardDate(0);
     }
 
     // Tomomrrow - Catch mispellings as well.
-    else if (d.includes('tom') || d.includes('Tom')) {
+    if (value.includes('tom')) {
         return getDaysForwardDate(1);
     }
 
+    // Is a day Name.
+    if (isDayName(value)) {
+        return getDayNameDate(value);
+    }
+
     // Date
-    else if (d.includes('/')) {
+    if (value.includes('/')) {
         return getParsedDate(d);
     }
 
     // Days Forward.
-    else if (d.includes('d')) {
+    if (value.includes('d') || value.includes('day')) {
         return getDaysForwardDate(d.slice(0, d.length - 1));
     }
 
     // Weeks Forward.
-    else if (d.includes('w')) {
+    if (value.includes('w')) {
         return getWeeksForwardDate((d.slice(0, d.length - 1)));
     }
 

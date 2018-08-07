@@ -667,6 +667,13 @@ export function appReducer(state, action) {
                 projectSelectorDueDateDisplays: getProjectSelectorDueDateDisplaysHelper(state.tasks),
             }
         }
+        
+        case ActionTypes.SET_IS_UPDATE_SNACKBAR_OPEN: {
+            return {
+                ...state,
+                isUpdateSnackbarOpen: action.value,
+            }
+        }
 
         default:
             console.log("App Reducer is missing a Case for action:  " + action.type);
