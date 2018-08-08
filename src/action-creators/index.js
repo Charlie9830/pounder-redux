@@ -1729,7 +1729,7 @@ export function removeTaskListAsync(taskListWidgetId) {
             var taskIds = collectTaskListRelatedTaskIds(getState().tasks, taskListWidgetId);
 
             // Build Batch.
-            var batch = getFirestore().batch();
+            var batch = new FirestoreBatchPaginator(getFirestore());
 
             if (isRemovingLastTaskList(getState, selectedProjectId)) {
                 // We are about to remove the last Task list. Queue up a request to delete any remaining Project Layouts.
