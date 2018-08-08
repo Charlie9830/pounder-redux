@@ -2368,7 +2368,7 @@ export function getAccountConfigAsync() {
 
                 dispatch(selectProject(favouriteProjectId));
                 
-                if (HANDBALL_DEVICE === "mobile") {
+                if (HANDBALL_DEVICE === "mobile" && favouriteProjectId !== -1) {
                     dispatch(setIsSidebarOpen(false));
                     dispatch(setIsAppSettingsOpen(false));
                 }
