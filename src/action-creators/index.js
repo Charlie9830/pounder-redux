@@ -2901,15 +2901,30 @@ function handleAuthError(dispatch, error) {
 
 
 function parseArgumentsIntoUpdate(getState, update) {
-    // stringArgv() will remove single apostraphes, replace them with a \ for now, we will put the apostraphes back in later.
-    var taskName = update.taskName.replace(/'/g, "\\");
+    // Search for Arguments in taskName.
+    var taskName = update.taskName;
+    var argumentStartIndex = taskName.indexOf(" -");
+
+    if (argumentStartIndex === -1) {
+        // No Arguments Found. Bail out.
+        return update;
+    }
+
+    // Split Arguments from from Normal Task Name.
+    var taskSubstring = taskName.substring(0, argumentStartIndex);
+    var argumentsSubstring = taskName.substring(argumentStartIndex);
+
+    // Coerce Values.
+    taskSubstring = taskSubstring === undefined ? "" : taskSubstring;
+    argumentsSubstring = argumentsSubstring === undefined ? "" : argumentsSubstring;
 
     // Convert string into args array.
-    var args = stringArgv(taskName);
+    var args = stringArgv(argumentsSubstring);
 
     // Parse arguments.
     var argv = parseArgs(args);
 
+    // Merge arguments with provided update.
     var parsedUpdate = { ...update };
 
     // dueDate.
@@ -2943,21 +2958,21 @@ function parseArgumentsIntoUpdate(getState, update) {
         }
     }
 
-    // Use text ignored by parseArgs to rebuild taskName,
-    // but first put the apostraphes you removed earlier back into the string.
-    parsedUpdate.taskName = (argv._.join(" ")).replace(/\\/g, "'");
+    // Set taskName to everything except the arguments.
+    parsedUpdate.taskName = taskSubstring;
 
-    // Override with Lorem Ipsum Text.
-    if (argv.l !== undefined) {
-        if (argv.l === true) {
-            parsedUpdate.taskName = loremIpsum({count: 1, random: Math.random});
-        }
+    // Override with Lorem Ipsum Text if in Dev.
+    if (process.env.NODE_ENV === 'development') {
+        if (argv.l !== undefined) {
+            if (argv.l === true) {
+                parsedUpdate.taskName = loremIpsum({ count: 1, random: Math.random });
+            }
 
-        else {
-            parsedUpdate.taskName = loremIpsum({count: argv.l, random: Math.random});
+            else {
+                parsedUpdate.taskName = loremIpsum({ count: argv.l, random: Math.random });
+            }
         }
     }
-
     return parsedUpdate;
 }
 
