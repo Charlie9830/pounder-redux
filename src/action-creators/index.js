@@ -2290,7 +2290,7 @@ export function addNewTaskListAsync() {
                 selectedProjectId,
                 newTaskListRef.id,
                 newTaskListRef.id,
-                Object.assign({}, new TaskListSettingsStore(true, "completed", ChecklistSettingsFactory(false,"", "", 1))),
+                Object.assign({}, new TaskListSettingsStore(true, "date added", ChecklistSettingsFactory(false,"", "", 1))),
                 true,
             )
 
@@ -2334,7 +2334,7 @@ export function addNewTaskListWithNameAsync(taskListName) {
                 selectedProjectId,
                 newTaskListRef.id,
                 newTaskListRef.id,
-                Object.assign({}, new TaskListSettingsStore(true, "completed", ChecklistSettingsFactory(false,"", "", 1))),
+                Object.assign({}, new TaskListSettingsStore(true, "date added", ChecklistSettingsFactory(false,"", "", 1))),
                 true,
             )
 
