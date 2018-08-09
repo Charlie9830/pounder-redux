@@ -1701,9 +1701,6 @@ export function updateTaskDueDateAsync(taskId, newDate, oldDate, currentMetadata
 
 export function updateTaskListSettingsAsync(taskListWidgetId, newValue) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-
-        console.log(Moment(newValue.checklistSettings.nextRenewDate).format("dddd, MMMM Do YYYY, h:mm:ss a"));
-
         // Update Firestore.
         var taskListRef = getTaskListRef(getFirestore, getState, taskListWidgetId);
 
@@ -1963,14 +1960,15 @@ export function updateTaskCompleteAsync(taskListWidgetId, taskId, newValue, oldV
 
             // Update Firestore.
             var taskRef = getTaskRef(getFirestore, getState, taskId);
+            var completedBy = newValue === true ? getState().displayName : "";
+            var completedOn = newValue === true ? getHumanFriendlyDate() : "";
 
             taskRef.update({
                 isComplete: newValue,
                 isNewTask: false,
                 metadata: getUpdatedMetadata(currentMetadata, {
-                    updatedBy: getState().displayName,
-                    updatedOn: getHumanFriendlyDate(),
-                    completedBy: getState().displayName
+                    completedBy: completedBy,
+                    completedOn: completedOn,
                 })
             }).then(() => {
                 // Carefull what you do here, promises don't resolve if you are offline.h.
@@ -2170,7 +2168,7 @@ export function addNewTaskAsync() {
                     newTaskRef = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).doc();
                 }
                 
-                var metadata = new TaskMetadataStore(getState().displayName, getHumanFriendlyDate(new Date()), "", "", "");
+                var metadata = new TaskMetadataStore(getState().displayName, getHumanFriendlyDate(new Date()), "", "", "","");
 
                 var newTaskKey = newTaskRef.id;
                 var newTask = new TaskStore(
@@ -2224,7 +2222,7 @@ export function addNewTaskWithNameAsync(taskName) {
                 newTaskRef = getFirestore().collection(USERS).doc(getUserUid()).collection(TASKS).doc();
             }
 
-            var metadata = new TaskMetadataStore(getState().displayName, getHumanFriendlyDate(new Date()), "", "", "");
+            var metadata = new TaskMetadataStore(getState().displayName, getHumanFriendlyDate(new Date()), "", "", "","");
 
             
             // Parse Arguments into an Update Object.
@@ -2494,7 +2492,6 @@ export function getTaskListsAsync(projectId) {
 }
 
 function handleTaskListsSnapshot(getState, dispatch, isRemote, snapshot, remoteProjectId) {
-    console.log("Ding");
     // Handle Metadata.
     if (snapshot.metadata !== undefined ) {
         dispatch(setTaskListsHavePendingWrites(snapshot.metadata.hasPendingWrites));
@@ -2760,10 +2757,11 @@ function shouldUpdateMetadata(currentMetadata) {
 function getUpdatedMetadata(currentMetadata, update) {
     // Coerce currentMetadata to a Valid object.
     if (currentMetadata === undefined) {
-        currentMetadata = Object.assign({}, new TaskMetadataStore("","","","",""));
+        currentMetadata = Object.assign({}, new TaskMetadataStore("","","","","",""));
     }
+    if (currentMetadata['completedOn'] === undefined) {currentMetadata['completedOn'] = ""}
 
-    if (shouldUpdateMetadata(currentMetadata)) {;
+    if (shouldUpdateMetadata(currentMetadata)) {
         // Merge update into currentMetadata.
         for (var propertyName in update) {
             currentMetadata[propertyName] = update[propertyName];
