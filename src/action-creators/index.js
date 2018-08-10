@@ -619,9 +619,7 @@ export function renewChecklistAsync(taskList, isRemote, projectId, userTriggered
                     getFirestore().collection(REMOTES).doc(projectId).collection(TASKLISTS).doc(taskListId) :
                     getFirestore().collection(USERS).doc(getUserUid()).collection(TASKLISTS).doc(taskListId);
 
-                var { nextRenewDate, renewInterval } = taskList.settings.checklistSettings;
-
-                var newChecklistSettings = { ...taskList.settings.checklistSettings, nextRenewDate: getNewRenewDate(nextRenewDate, renewInterval) };
+                var newChecklistSettings = { ...taskList.settings.checklistSettings, lastRenewDate: getNormalizedDate(Moment()) };
                 var newTaskListSettings = { ...taskList.settings, checklistSettings: newChecklistSettings };
 
                 batch.update(taskListRef, { settings: newTaskListSettings });
@@ -2533,8 +2531,7 @@ function handleTaskListsSnapshot(getState, dispatch, isRemote, snapshot, remoteP
 
 function processChecklists(dispatch, checklists, isRemote, remoteProjectId) {
     checklists.forEach(item => {
-
-        if (isChecklistDueForRenew(item.settings.checklistSettings.nextRenewDate)) {
+        if (isChecklistDueForRenew(item.settings.checklistSettings)) {
             dispatch(renewChecklistAsync(item, isRemote, remoteProjectId, false));
         }
     })
