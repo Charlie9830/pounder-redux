@@ -3,3 +3,4 @@ action-creators/
 action-types/
 reducers/
 index.js
+.vscode/
