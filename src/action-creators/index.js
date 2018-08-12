@@ -2139,6 +2139,7 @@ export function moveTaskAsync(destinationTaskListId, taskId) {
         })
 
         dispatch(endTaskMove(movingTaskId, destinationTaskListId));
+        dispatch(changeFocusedTaskList(destinationTaskListId));
 
         // Project updated metadata.
         updateProjectUpdatedTime(getState, getFirestore, getState().selectedProjectId);
