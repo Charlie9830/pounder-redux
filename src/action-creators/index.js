@@ -2118,11 +2118,12 @@ export function updateTaskListWidgetHeaderAsync(taskListWidgetId, newName, oldNa
 }
 
 
-export function moveTaskAsync(destinationTaskListId) {
+export function moveTaskAsync(destinationTaskListId, taskId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         dispatch(startTaskMoveInDatabase());
 
-        var movingTaskId = getState().movingTaskId;
+        // If Task was moved via Drag and Drop, taskId will have been passed in as parameter.
+        var movingTaskId = taskId === undefined ? getState().movingTaskId : taskId;
         var taskRef = getTaskRef(getFirestore, getState, movingTaskId);
 
         // Can't get currentMetadata from the Task directly, so extract it here.
