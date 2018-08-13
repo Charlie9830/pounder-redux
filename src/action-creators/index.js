@@ -1435,7 +1435,7 @@ export function unsubscribeRemoteIds() {
 
 export function logOutUserAsync() {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
-        unsubscribeFromDatabaseAsync();
+        dispatch(unsubscribeFromDatabaseAsync());
 
         getAuth().signOut().then(() => {
 
