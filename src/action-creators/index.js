@@ -2900,7 +2900,7 @@ function handleAuthError(dispatch, error) {
 function parseArgumentsIntoUpdate(getState, update) {
     // Search for Arguments in taskName.
     var taskName = update.taskName;
-    var argumentStartIndex = taskName.indexOf(" -");
+    var argumentStartIndex = getArgumentsStartIndex(taskName);
 
     if (argumentStartIndex === -1) {
         // No Arguments Found. Bail out.
@@ -2971,6 +2971,19 @@ function parseArgumentsIntoUpdate(getState, update) {
         }
     }
     return parsedUpdate;
+}
+
+function getArgumentsStartIndex(taskName) {
+    var regex = / -[a-zA-Z]/ // Search for Whitepace THEN Hypen THEN Any Alphanumeric Character.
+    var match = regex.exec(taskName);
+
+    if (match) {
+        return match.index;
+    }
+
+    else {
+        return -1;
+    }
 }
 
 function fuzzyMatchUserId(getState, entry) {
