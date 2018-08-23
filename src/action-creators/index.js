@@ -949,6 +949,12 @@ export function unsubscribeFromRemoteProjectAsync(projectId) {
 
         // Members.
         remoteProjectsUnsubscribes[projectId].members();
+
+        // Extract and remove from state.
+        var filteredMembers = getState().members.filter(item => {
+            return item.project !== projectId;
+        })
+        dispatch(receiveMembers(filteredMembers));
         
         // TaskLists.
         remoteProjectsUnsubscribes[projectId].taskLists();
