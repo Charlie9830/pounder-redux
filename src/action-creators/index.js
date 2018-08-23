@@ -1918,7 +1918,7 @@ export function addNewProjectWithNameAsync(projectName) {
 
         if (getState().isLoggedIn === true) {
             // Update Firestore.    
-            var newProjectName = projectName;
+            var newProjectName = projectName === "" ? "Untitled Project" : projectName;
             var batch = getFirestore().batch();
 
             // Project.
