@@ -939,7 +939,7 @@ function handleMembersSnapshot(getState, dispatch, snapshot, projectId) {
 export function unsubscribeFromRemoteProjectAsync(projectId) {
     return (dispatch, getState, { getFirestore, getAuth, getDexie, getFunctions }) => {
         // Project.
-        remoteProjectsUnsubscribes[projectId].project();
+        remoteProjectsUnsubscribes[projectId].project;
         
         // Extract and remove from State.
         var remoteProjects = getState().remoteProjects.filter(item => {
